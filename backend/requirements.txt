@@ -1,0 +1,13 @@
+agent-framework-core==1.21.0
+agent-framework-openai==1.16.0
+agent-framework-foundry==1.14.1
+azure-ai-projects==2.7.0
+azure-identity==1.26.0
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+mcp==1.30.0
+numpy==2.5.3
+openai==3.26.1
+pydantic==2.14.0
+python-dotenv==1.2.4
+httpx==0.28.1
