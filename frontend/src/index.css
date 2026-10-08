@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Inter", sans-serif;
+  --color-ink-950: #070b16;
+  --color-ink-900: #0b1020;
+  --color-ink-850: #0f1629;
+  --color-ink-800: #131c33;
+  --color-ink-700: #1c2846;
+  --color-ink-600: #2a3a63;
+  --color-ink-400: #7f90b8;
+  --color-ink-300: #a9b6d6;
+  --color-ink-100: #e7ecfb;
+  --color-mint-400: #2ee6a6;
+  --color-mint-500: #14c98a;
+  --color-sky-400: #7dd3fc;
+  --color-amber-400: #fbbf24;
+  --color-rose-400: #fb7185;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(1200px 600px at 10% -10%, #15224a 0%, transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, #0e3b3a 0%, transparent 55%), var(--color-ink-950);
+  color: var(--color-ink-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.panel {
+  background: color-mix(in srgb, var(--color-ink-850) 88%, transparent);
+  border: 1px solid var(--color-ink-700);
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+}
+
+.chip-evidence {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 6px;
+  margin: 0 2px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--color-ink-950);
+  background: var(--color-sky-400);
+  cursor: pointer;
+  vertical-align: 1px;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+
+.chip-evidence:hover {
+  background: var(--color-mint-400);
+  transform: translateY(-1px);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-600) transparent;
+}
+
+input[type='range'] {
+  accent-color: var(--color-mint-400);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.35s ease both;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.live-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
