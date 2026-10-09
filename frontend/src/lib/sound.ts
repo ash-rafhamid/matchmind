@@ -10,14 +10,21 @@ export class Atmosphere {
   private bed: GainNode
   private bedFilter: BiquadFilterNode
   private noise: AudioBuffer
-  private level = 0.25
+  private level = 0.5
 
   constructor() {
     this.ctx = new AudioContext()
+    // browsers start audio "asleep" unless a page wakes it after a click
+    void this.ctx.resume()
+    // a compressor keeps the roar loud without distorting
+    const comp = this.ctx.createDynamicsCompressor()
+    comp.threshold.value = -14
+    comp.ratio.value = 4
+    comp.connect(this.ctx.destination)
     this.master = this.ctx.createGain()
     this.master.gain.value = 0.0001
-    this.master.connect(this.ctx.destination)
-    this.master.gain.exponentialRampToValueAtTime(0.9, this.ctx.currentTime + 1.2)
+    this.master.connect(comp)
+    this.master.gain.exponentialRampToValueAtTime(1.0, this.ctx.currentTime + 0.8)
 
     this.noise = this.makeNoise(4)
     // crowd bed: brown-ish noise through two vocal-range band-passes, slowly breathing
@@ -39,6 +46,8 @@ export class Atmosphere {
     lfo.connect(lfoGain).connect(this.bed.gain)
     lfo.start()
     src.connect(this.bedFilter).connect(hi).connect(this.bed).connect(this.master)
+    // a short whistle so you know the sound is on
+    window.setTimeout(() => this.whistle(false), 250)
   }
 
   private makeNoise(seconds: number): AudioBuffer {
@@ -52,6 +61,11 @@ export class Atmosphere {
         last = (last + 0.04 * w) / 1.04 // brown noise: warm, like thousands of distant voices
         d[i] = last * 3.2 + w * 0.08
       }
+      // normalise, so the crowd is properly loud
+      let peak = 0
+      for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i]))
+      const g = 0.85 / Math.max(peak, 1e-6)
+      for (let i = 0; i < len; i++) d[i] *= g
     }
     return buf
   }
@@ -67,7 +81,7 @@ export class Atmosphere {
 
   /** 0 (ball in midfield) .. 1 (ball in the box): the crowd rises with the danger. */
   setTension(x: number) {
-    const target = 0.2 + 0.28 * Math.max(0, Math.min(1, x))
+    const target = 0.45 + 0.5 * Math.max(0, Math.min(1, x))
     this.level += (target - this.level) * 0.15
     const t = this.ctx.currentTime
     this.bed.gain.setTargetAtTime(this.level, t, 0.6)
@@ -85,7 +99,7 @@ export class Atmosphere {
     f.Q.value = 0.9
     const g = this.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.25 + 0.9 * size, t + 0.25 + 0.2 * size)
+    g.gain.exponentialRampToValueAtTime(0.6 + 1.6 * size, t + 0.25 + 0.2 * size)
     g.gain.exponentialRampToValueAtTime(0.0001, t + seconds)
     src.connect(f).connect(g).connect(this.master)
     src.stop(t + seconds + 0.1)
@@ -96,9 +110,9 @@ export class Atmosphere {
     const t = this.ctx.currentTime
     const g = this.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.18, t + 0.02)
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.02)
     const end = t + (long ? 0.9 : 0.35)
-    g.gain.setValueAtTime(0.18, end - 0.05)
+    g.gain.setValueAtTime(0.3, end - 0.05)
     g.gain.exponentialRampToValueAtTime(0.0001, end)
     const trem = this.ctx.createOscillator()
     const tg = this.ctx.createGain()
@@ -127,7 +141,7 @@ export class Atmosphere {
     o.frequency.exponentialRampToValueAtTime(55, t + 0.09)
     const g = this.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(0.12 + 0.25 * power, t + 0.005)
+    g.gain.exponentialRampToValueAtTime(0.3 + 0.5 * power, t + 0.005)
     g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14)
     o.connect(g).connect(this.master)
     o.start(t)
