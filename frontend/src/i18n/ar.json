@@ -245,5 +245,6 @@
  "reel.kickoff": "انطلاق المباراة",
  "reel.chance": "فرصة",
  "reel.second_half": "الشوط الثاني",
- "reel.fulltime": "نهاية المباراة"
+ "reel.fulltime": "نهاية المباراة",
+ "reel.restart": "إعادة التشغيل"
 }

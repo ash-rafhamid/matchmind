@@ -1,14 +1,15 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
-import { CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, ScoreBug, Transport, useAtmosphere, useCrossings, type PlayMode } from '../components/Broadcast'
+import { CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, RestartCut, ScoreBug, Transport, useAtmosphere, useCrossings, type PlayMode } from '../components/Broadcast'
 import CrewFeed from '../components/CrewFeed'
 import RecapPanel from '../components/RecapPanel'
 import StatsPanel from '../components/StatsPanel'
 import WhatIfPanel from '../components/WhatIfPanel'
 import { PlaybackClock } from '../lib/clock'
 import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
-import { buildReel, ReelDirector, type ReelState } from '../lib/reel'
+import { buildReel, buildSkips, ReelDirector, type ReelState } from '../lib/reel'
+import { Atmosphere } from '../lib/sound'
 import { TrackingStore } from '../lib/tracking'
 import { useT } from '../lib/settings'
 import { onPrimary } from '../lib/ui'
@@ -67,7 +68,36 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const director = useMemo(() => new ReelDirector(clock, store, buildReel(pkg)), [clock, store, pkg])
   const [mode, setModeState] = useState<PlayMode>('highlights')
   const [reel, setReel] = useState<ReelState>(() => director.state())
-  const [sound, setSound] = useState(false)
+  // sound is on by default; browsers only allow it to start from a click, so it starts with Play
+  const [sound, setSoundState] = useState(() => {
+    try {
+      return localStorage.getItem('mm.sound') !== '0'
+    } catch {
+      return true
+    }
+  })
+  const atm = useRef<Atmosphere | null>(null)
+  const startAudio = () => {
+    if (!atm.current) atm.current = new Atmosphere()
+  }
+  const setSound = (on: boolean) => {
+    setSoundState(on)
+    try {
+      localStorage.setItem('mm.sound', on ? '1' : '0')
+    } catch {
+      /* private mode */
+    }
+    if (on) startAudio()
+    else {
+      atm.current?.close()
+      atm.current = null
+    }
+  }
+  useEffect(() => () => atm.current?.close(), [])
+
+  // full match: cut dead-ball stretches like TV, straight to just before the restart
+  const skips = useMemo(() => buildSkips(pkg), [pkg])
+  const [cutTo, setCutTo] = useState<MatchEvent | null>(null)
   const replaying = useRef(false)
   replaying.current = reel.phase === 'replay' || (reel.phase === 'cut' && reel.cutTo === 'replay')
   useEffect(() => director.subscribe(setReel), [director])
@@ -85,7 +115,29 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
       director.start()
     }
   }
+  useEffect(() => {
+    if (mode !== 'full') return
+    let busy = false
+    return clock.subscribe(() => {
+      if (busy || !clock.playing) return
+      const t = clock.time
+      const s = skips.find((k) => t >= k.from && t < k.to)
+      if (!s) return
+      busy = true
+      clock.pause()
+      store.prefetch(s.to)
+      setCutTo(s.restart)
+      window.setTimeout(() => {
+        clock.seek(s.to)
+        clock.play()
+        setCutTo(null)
+        busy = false
+      }, 650)
+    })
+  }, [mode, clock, skips, store])
+
   const onPlay = () => {
+    if (sound) startAudio()
     if (mode === 'highlights') {
       if (reel.phase === 'off' || reel.phase === 'done') director.start()
       else if (clock.playing) clock.pause()
@@ -128,7 +180,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   return (
     <MatchCtx.Provider value={value}>
       <CrossingWatch goals={goals} onGoal={setGoal} onMoment={setLower} muted={replaying} />
-      <AtmosphereWatch on={sound} store={store} replaying={replaying} />
+      <AtmosphereWatch atm={atm} store={store} replaying={replaying} />
       <div className="grid xl:h-[calc(100vh-52px)] xl:grid-cols-[minmax(0,1fr)_440px]">
         <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
           <div className="relative min-h-[340px] flex-1">
@@ -150,6 +202,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               </div>
             </div>
             {goal && <GoalTakeover key={goal.id} goal={goal} />}
+            {cutTo && <RestartCut key={cutTo.id} to={cutTo} />}
             {mode === 'highlights' && (
               <ReelOverlay
                 reel={reel}
@@ -174,7 +227,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               )}
             </div>
           </div>
-          <Transport mode={mode} onMode={setMode} onPlay={onPlay} reel={reel} sound={sound} onSound={() => setSound((v) => !v)} />
+          <Transport mode={mode} onMode={setMode} onPlay={onPlay} reel={reel} sound={sound} onSound={() => setSound(!sound)} />
         </section>
 
         <aside className="plate flex min-h-[640px] min-w-0 flex-col xl:min-h-0">
@@ -225,8 +278,8 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 }
 
 /** Stadium sound has to live inside the match context, next to the other event watchers. */
-function AtmosphereWatch({ on, store, replaying }: { on: boolean; store: TrackingStore; replaying: { current: boolean } }) {
-  useAtmosphere(on, store, replaying)
+function AtmosphereWatch({ atm, store, replaying }: { atm: { current: Atmosphere | null }; store: TrackingStore; replaying: { current: boolean } }) {
+  useAtmosphere(atm, store, replaying)
   return null
 }
 

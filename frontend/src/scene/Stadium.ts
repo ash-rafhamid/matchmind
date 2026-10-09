@@ -78,6 +78,9 @@ const tmpV = new THREE.Vector3()
 const tmpS = new THREE.Vector3()
 const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0)
+const POOL = Array.from({ length: 8 }, () => new THREE.Matrix4())
+const tmpLook = new THREE.Vector3()
+const tmpNdc = new THREE.Vector3()
 
 export class Stadium {
   private container: HTMLElement
@@ -625,7 +628,7 @@ export class Stadium {
     this.lastNow = now
     if (!this.onScreen || document.hidden) return
 
-    const t = this.clock.time
+    const t = this.clock.timeAt(now)
     const f = this.store.frameAt(t)
     const ready = f !== null
     const changed = t !== this.lastMatchT || this.pointerMoved || this.cheer !== null || ready !== this.wasReady
@@ -701,8 +704,9 @@ export class Stadium {
       tmpQ.setFromAxisAngle(UP, b.heading)
       tmpB.compose(tmpV.set(x, bob * FIG, z), tmpQ, tmpS.setScalar(FIG))
       tmpB.multiply(tmpM.makeRotationX(lean))
+      let slot = 0
       const at = (ox: number, oy: number, rotX: number) => {
-        const m = new THREE.Matrix4().makeTranslation(ox, oy, 0)
+        const m = POOL[slot++].makeTranslation(ox, oy, 0)
         if (rotX) m.multiply(tmpM.makeRotationX(rotX))
         return m.premultiply(tmpB)
       }
@@ -840,7 +844,7 @@ export class Stadium {
     this.lastCut = shot
 
     const pos = tmpV
-    const look = new THREE.Vector3()
+    const look = tmpLook
     let fov = 22
     switch (shot) {
       case 'tactical':
@@ -904,7 +908,7 @@ export class Stadium {
       this.camera.updateProjectionMatrix()
     }
     // keep the tilt-shift's sharp band on the ball, so the action is always in focus
-    const ndc = this.ball.position.clone().project(this.camera)
+    const ndc = tmpNdc.copy(this.ball.position).project(this.camera)
     const target = Math.min(0.85, Math.max(0.15, (ndc.y + 1) / 2))
     this.focusY += (target - this.focusY) * (cut ? 1 : 1 - Math.exp(-4 * realDt))
     this.hPass.uniforms.r.value = this.vPass.uniforms.r.value = this.focusY

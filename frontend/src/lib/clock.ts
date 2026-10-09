@@ -12,6 +12,12 @@ export class PlaybackClock {
   readonly duration: number
   private listeners = new Set<() => void>()
   private last = 0
+  /** Match time at the moment `now` (performance.now()), extrapolated from the last tick so rendering never judders. */
+  timeAt(now: number): number {
+    if (!this.playing || this.buffering) return this.time
+    const ahead = Math.max(0, Math.min(0.1, (now - this.last) / 1000)) * this.speed
+    return Math.min(this.duration, this.time + ahead)
+  }
   private raf = 0
   private stopAt: number | null = null
 

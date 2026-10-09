@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { formatClock, useClock } from '../lib/clock'
 import { lastEventIndex, scoreAt, useMatch } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
 import { momentTitle, onPrimary, surname } from '../lib/ui'
 import type { ReelState } from '../lib/reel'
-import { Atmosphere } from '../lib/sound'
+import type { Atmosphere } from '../lib/sound'
 import type { TrackingStore } from '../lib/tracking'
 import type { CameraMode } from '../scene/Stadium'
 import type { CrewResult, MatchEvent, Moment } from '../types'
@@ -218,6 +218,22 @@ export function Transport({ mode, onMode, onPlay, reel, sound, onSound }: Transp
   )
 }
 
+/** The cut from a dead-ball stretch to the restart. */
+export function RestartCut({ to }: { to: MatchEvent }) {
+  const t = useT()
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+      <div className="wipe absolute inset-0 bg-ink/80" />
+      <div className="absolute inset-0 grid place-items-center">
+        <div className="wipe flex items-stretch shadow-[0_12px_40px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.08s' }}>
+          <span className="cut-l flex items-center bg-volt ps-5 pe-3 xp text-[clamp(18px,3vw,30px)] text-ink tab-num">{to.clock}</span>
+          <span className="cut-r flex items-center bg-white pe-6 ps-3 xp text-[clamp(16px,2.5vw,26px)] text-ink">⏩ {t('reel.restart')}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const CLIP_KEY: Record<string, string> = { kickoff: 'reel.kickoff', chance: 'reel.chance', fulltime: 'reel.fulltime' }
 
 /** What the edit shows between clips: a wipe with the next moment, or the REPLAY bug over a slow-motion replay. */
@@ -276,26 +292,30 @@ export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull
   return null
 }
 
-/** Stadium sound, driven by the match: tension from where the ball is, reactions to shots, goals and whistles. */
-export function useAtmosphere(on: boolean, store: TrackingStore, replaying: { current: boolean }) {
+/**
+ * Stadium sound, driven by the match: tension from where the ball is, reactions to shots and goals,
+ * and the referee's whistle at kick-offs, fouls, offsides, goals and full time.
+ * The page owns the audio (it can only start after a click), this hook just plays the match into it.
+ */
+export function useAtmosphere(atm: { current: Atmosphere | null }, store: TrackingStore, replaying: { current: boolean }) {
   const { pkg, clock } = useMatch()
-  const atm = useRef<Atmosphere | null>(null)
-  const events = useMemo(() => pkg.events.filter((e) => ['shot', 'goal', 'period_start', 'period_end', 'card', 'foul'].includes(e.type)), [pkg.events])
+  const half = pkg.meta.period_lengths_s['1']
+  const events = useMemo(
+    () =>
+      pkg.events.filter(
+        (e) => ['shot', 'goal', 'period_start', 'period_end', 'card', 'foul', 'offside'].includes(e.type) || (e.type === 'pass' && e.set_piece === 'kickoff'),
+      ),
+    [pkg.events],
+  )
 
   useEffect(() => {
-    if (!on) return
-    const a = new Atmosphere()
-    atm.current = a
     const timer = window.setInterval(() => {
+      const a = atm.current
       const b = store.ballAt(clock.time)
-      if (b) a.setTension(Math.max(0, (Math.abs(b[0] - 52.5) - 20) / 32))
+      if (a && b) a.setTension(Math.max(0, (Math.abs(b[0] - 52.5) - 20) / 32))
     }, 300)
-    return () => {
-      clearInterval(timer)
-      a.close()
-      atm.current = null
-    }
-  }, [on, clock, store])
+    return () => clearInterval(timer)
+  }, [atm, clock, store])
 
   const onCross = useCallback(
     (e: MatchEvent | Moment) => {
@@ -305,11 +325,16 @@ export function useAtmosphere(on: boolean, store: TrackingStore, replaying: { cu
       if (ev.type === 'shot') {
         a.thud(0.9)
         if (ev.outcome !== 'goal') a.swell(0.25 + Math.min(0.5, (ev.xg ?? 0) * 1.4), 2.2)
-      } else if (ev.type === 'goal') a.swell(replaying.current ? 0.45 : 1, replaying.current ? 3 : 7)
-      else if (ev.type === 'period_start' || ev.type === 'period_end') a.whistle(true)
-      else if (ev.type === 'card' || ev.type === 'foul') a.whistle(false)
+      } else if (ev.type === 'goal') {
+        a.swell(replaying.current ? 0.45 : 1, replaying.current ? 3 : 7)
+        if (!replaying.current) window.setTimeout(() => a.whistle(false), 350)
+      } else if (ev.type === 'pass') a.whistle(true) // kick-off
+      else if (ev.type === 'period_end') {
+        if (ev.ts > half + 60) a.fullTime()
+        else a.whistle(true)
+      } else if (ev.type === 'card' || ev.type === 'foul' || ev.type === 'offside') a.whistle(false)
     },
-    [replaying],
+    [replaying, atm, half],
   )
   useCrossings(events, onCross)
 }

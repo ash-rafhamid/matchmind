@@ -245,5 +245,6 @@
  "reel.kickoff": "Coup d'envoi",
  "reel.chance": "Occasion",
  "reel.second_half": "Deuxième mi-temps",
- "reel.fulltime": "Fin du match"
+ "reel.fulltime": "Fin du match",
+ "reel.restart": "Redémarrer"
 }

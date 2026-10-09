@@ -148,6 +148,13 @@ export class Atmosphere {
     o.stop(t + 0.16)
   }
 
+  /** Full time: three blasts. */
+  fullTime() {
+    this.whistle(false)
+    window.setTimeout(() => this.whistle(false), 450)
+    window.setTimeout(() => this.whistle(true), 900)
+  }
+
   close() {
     const t = this.ctx.currentTime
     this.master.gain.setTargetAtTime(0.0001, t, 0.15)
