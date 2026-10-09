@@ -1,10 +1,11 @@
 import { Fragment } from 'react'
 import { useMatch } from '../lib/match'
+import { tidyTags } from '../lib/ui'
 
 /** Crew text with [#id] evidence tags turned into minute chips; each one replays that event in the stadium. */
 export default function StoryText({ text, className = '' }: { text: string; className?: string }) {
   const { focusEvidence, eventsById } = useMatch()
-  const parts = text.split(/(\s*\[#\d+\])/g)
+  const parts = tidyTags(text).split(/(\s*\[#\d+\])/g)
   return (
     <p className={`copy whitespace-pre-line ${className}`}>
       {parts.map((part, i) => {

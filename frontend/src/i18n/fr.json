@@ -246,5 +246,6 @@
  "reel.chance": "Occasion",
  "reel.second_half": "Deuxième mi-temps",
  "reel.fulltime": "Fin du match",
- "reel.restart": "Redémarrer"
+ "reel.restart": "Reprendre à",
+ "reel.next": "Moment fort suivant"
 }

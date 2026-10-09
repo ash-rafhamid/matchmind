@@ -246,5 +246,6 @@
  "reel.chance": "Chance",
  "reel.second_half": "Second half",
  "reel.fulltime": "Full time",
- "reel.restart": "Restart"
+ "reel.restart": "Restart at",
+ "reel.next": "Next highlight"
 }

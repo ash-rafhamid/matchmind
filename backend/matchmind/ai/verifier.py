@@ -20,12 +20,12 @@ SCORE_STRING = re.compile(r"^(\d{1,2})-(\d{1,2})$")
 CLUB = re.compile(r"\b(?:[A-Z][a-z]+ ){1,2}(?:City|Town|United|Rovers|Athletic|Albion|FC|Wanderers|County|Rangers)\b")
 ALWAYS_OK = {0.0, 1.0, 2.0, 3.0, 10.0, 11.0, 45.0, 90.0, 100.0}  # one-two, 3 points, "4 in 10", 11 v 11, halves
 
-MULTI_TAG = re.compile(r"\[\s*#?(\d+)(?:\s*[,;]\s*#?\d+)+\s*\]")
+MULTI_TAG = re.compile(r"\[\s*#?(\d+)(?:\s*(?:[,;\-\u2013]|to|and|&)\s*#?\d+)+\s*\]")
 LOOSE_TAG = re.compile(r"\[(?!#\d)[^\]\n]{1,40}\]")
 
 
 def normalize_tags(text: str) -> str:
-    """Model output clean-up: "[#40, #45]" -> "[#40] [#45]", and drop bracket tags that are not event ids."""
+    """Model output clean-up: "[#40, #45]" / "[#40-#45]" -> "[#40] [#45]", and drop bracket tags that are not event ids."""
     text = MULTI_TAG.sub(lambda m: " ".join(f"[#{i}]" for i in re.findall(r"\d+", m.group(0))), text)
     text = LOOSE_TAG.sub("", text)
     return re.sub(r"[ \t]{2,}", " ", text).replace(" .", ".").replace(" ,", ",").strip()

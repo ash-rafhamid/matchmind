@@ -31,7 +31,10 @@ def get(key: str) -> dict | None:
     for folder in (RUNTIME, PRECOMPUTED):
         path = folder / f"{key}.json"
         if path.exists():
-            return json.loads(path.read_text(encoding="utf-8"))
+            try:
+                return json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue  # a half-written entry: treat it as missing
     return None
 
 

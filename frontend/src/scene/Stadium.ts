@@ -27,7 +27,12 @@ export type CameraMode = 'director' | 'broadcast' | 'tactical' | 'goal' | 'follo
 
 const L = 105
 const W = 68
-const FIG = 1.3 // figures are scaled up a little so they read at broadcast distance
+const FIG = 1.22 // figures are scaled up a little so they read at broadcast distance
+const HIP = 0.98
+const THIGH = 0.46
+const SHIN = 0.46
+const SHOULDER = 1.44
+const UPPER_ARM = 0.29
 const BALL_R = 0.36
 const STRIDE = 1.9 // metres per full running cycle (two steps)
 const SKIN = ['#f1c9a5', '#e0b18a', '#c68f63', '#9c6a46', '#6e4a33', '#4f3324']
@@ -71,6 +76,15 @@ class Part {
   }
 }
 
+type PartName = 'torso' | 'shorts' | 'neck' | 'head' | 'hair' | 'thighs' | 'shins' | 'boots' | 'upperArms' | 'foreArms' | 'hands'
+const SINGLE: PartName[] = ['torso', 'shorts', 'neck', 'head', 'hair']
+const PAIRED: PartName[] = ['thighs', 'shins', 'boots', 'upperArms', 'foreArms', 'hands']
+
+/** A body shape turned on a lathe: [radius, height] from the bottom up. */
+function lathe(profile: [number, number][], segments = 16): THREE.BufferGeometry {
+  return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments)
+}
+
 const tmpM = new THREE.Matrix4()
 const tmpB = new THREE.Matrix4()
 const tmpQ = new THREE.Quaternion()
@@ -78,7 +92,7 @@ const tmpV = new THREE.Vector3()
 const tmpS = new THREE.Vector3()
 const UP = new THREE.Vector3(0, 1, 0)
 const ZERO = new THREE.Matrix4().makeScale(0, 0, 0)
-const POOL = Array.from({ length: 8 }, () => new THREE.Matrix4())
+const POOL = Array.from({ length: 16 }, () => new THREE.Matrix4())
 const tmpLook = new THREE.Vector3()
 const tmpNdc = new THREE.Vector3()
 
@@ -105,7 +119,7 @@ export class Stadium {
 
   private ids: string[] = []
   private bodies: Body[] = []
-  private parts!: Record<'torso' | 'shorts' | 'legs' | 'socks' | 'boots' | 'arms' | 'sleeves' | 'head' | 'hair', Part>
+  private parts!: Record<PartName, Part>
   private ball!: THREE.Mesh
   private ballMark!: THREE.Mesh
   private ring!: THREE.Mesh
@@ -120,9 +134,12 @@ export class Stadium {
   private tagText = new Map<CSS2DObject, string>()
   private crowd: THREE.InstancedMesh | null = null
   private crowdBase: { m: THREE.Matrix4; side: Side | 'n' }[] = []
-  private cheer: { side: Side; until: number } | null = null
+  /** A goal celebration, tied to match time: [from, until). Rewinding for a replay goes back before it. */
+  private cheer: { side: Side; from: number; until: number } | null = null
   private ballEvents: MatchEvent[]
   private shots: Shot[]
+  /** When each goal's ball crosses the line, in match time. */
+  private goalsIn: { side: Side; from: number }[]
 
   private mode: CameraMode = 'director'
   private override: { shot: 'replay'; dir: 1 | -1 } | null = null
@@ -172,6 +189,7 @@ export class Stadium {
     this.composer.addPass(new OutputPass())
 
     this.ballEvents = pkg.events.filter((e) => BALL_TYPES.has(e.type))
+    this.goalsIn = pkg.events.filter((e) => e.type === 'shot' && e.outcome === 'goal').map((e) => ({ side: e.team, from: e.ts + e.dur }))
     this.shots = pkg.events
       .filter((e) => e.type === 'shot' && (e.outcome === 'goal' || e.outcome === 'saved' || (e.xg ?? 0) >= 0.12))
       .map((e) => ({ ts: e.ts, dir: e.team === 'home' ? 1 : -1, goal: e.outcome === 'goal' }))
@@ -511,25 +529,34 @@ export class Stadium {
       }
   }
 
-  /** Little footballers: shirt, shorts, socks, boots, arms, head and hair, all instanced. */
+  /**
+   * Footballers with human proportions - chest, waist, neck, head, thighs and shins with knees,
+   * upper arms and forearms with elbows - every body part instanced across all players.
+   */
   private buildFigures() {
     const meta = this.pkg.meta
     const players = (['home', 'away'] as Side[]).flatMap((side) => meta.teams[side].players.map((p) => ({ p, side })))
     const n = players.length
     this.ids = players.map(({ p }) => p.id)
-    const g = {
-      torso: new THREE.CylinderGeometry(0.23, 0.18, 0.54, 12),
-      shorts: new THREE.CylinderGeometry(0.2, 0.215, 0.24, 12),
-      legs: new THREE.CapsuleGeometry(0.085, 0.66, 4, 8).translate(0, -0.415, 0),
-      socks: new THREE.CylinderGeometry(0.098, 0.092, 0.34, 8).translate(0, -0.58, 0),
-      boots: new THREE.BoxGeometry(0.13, 0.09, 0.27).translate(0, -0.79, 0.05),
-      arms: new THREE.CapsuleGeometry(0.055, 0.44, 4, 8).translate(0, -0.275, 0),
-      sleeves: new THREE.CylinderGeometry(0.078, 0.072, 0.18, 8).translate(0, -0.07, 0),
-      head: new THREE.SphereGeometry(0.125, 14, 10),
-      hair: new THREE.SphereGeometry(0.133, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5).translate(0, 0.012, -0.012),
+    const torso = lathe([[0.13, 0], [0.135, 0.08], [0.15, 0.2], [0.175, 0.32], [0.182, 0.4], [0.165, 0.46], [0.115, 0.505], [0.05, 0.53], [0, 0.535]], 20)
+    torso.scale(1.26, 1, 0.68)
+    const shorts = lathe([[0, -0.01], [0.165, 0], [0.175, 0.08], [0.16, 0.2], [0.145, 0.25], [0, 0.26]], 20)
+    shorts.scale(1.18, 1, 0.82)
+    const g: Record<PartName, THREE.BufferGeometry> = {
+      torso,
+      shorts,
+      neck: new THREE.CylinderGeometry(0.052, 0.06, 0.12, 10),
+      head: new THREE.SphereGeometry(0.108, 16, 12).scale(0.92, 1.12, 1),
+      hair: new THREE.SphereGeometry(0.115, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.48).scale(0.94, 1.08, 1.04).translate(0, 0.022, -0.012),
+      thighs: new THREE.CapsuleGeometry(0.078, THIGH - 0.12, 4, 10).translate(0, -THIGH / 2, 0),
+      shins: new THREE.CapsuleGeometry(0.062, SHIN - 0.1, 4, 10).translate(0, -SHIN / 2, 0),
+      boots: new THREE.BoxGeometry(0.1, 0.07, 0.25).translate(0, -SHIN - 0.01, 0.05),
+      upperArms: new THREE.CapsuleGeometry(0.052, UPPER_ARM - 0.1, 4, 8).translate(0, -UPPER_ARM / 2, 0),
+      foreArms: new THREE.CapsuleGeometry(0.044, 0.22, 4, 8).translate(0, -0.15, 0),
+      hands: new THREE.SphereGeometry(0.048, 10, 8).scale(0.75, 1.25, 0.55).translate(0, -0.34, 0),
     }
-    const counts = { torso: n, shorts: n, legs: 2 * n, socks: 2 * n, boots: 2 * n, arms: 2 * n, sleeves: 2 * n, head: n, hair: n }
-    this.parts = Object.fromEntries(Object.entries(g).map(([k, geo]) => [k, new Part(geo, counts[k as keyof typeof counts], this.scene)])) as Stadium['parts']
+    const counts = Object.fromEntries(Object.keys(g).map((k) => [k, PAIRED.includes(k as PartName) ? 2 * n : n])) as Record<PartName, number>
+    this.parts = Object.fromEntries(Object.entries(g).map(([k, geo]) => [k, new Part(geo, counts[k as PartName], this.scene)])) as Record<PartName, Part>
     const col = new THREE.Color()
     players.forEach(({ p, side }, i) => {
       const team = meta.teams[side]
@@ -539,17 +566,19 @@ export class Stadium {
       const shorts = gk ? '#1f1f1f' : team.secondary
       const socks = gk ? '#1f1f1f' : team.primary
       const skin = SKIN[h % SKIN.length]
-      const set = (part: keyof Stadium['parts'], idx: number, c: string) => this.parts[part].mesh.setColorAt(idx, col.set(c))
+      const set = (part: PartName, idx: number, c: string) => this.parts[part].mesh.setColorAt(idx, col.set(c))
       set('torso', i, shirt)
       set('shorts', i, shorts)
+      set('neck', i, skin)
       set('head', i, skin)
       set('hair', i, HAIR[(h >> 3) % HAIR.length])
       for (const k of [2 * i, 2 * i + 1]) {
-        set('legs', k, skin)
-        set('socks', k, socks)
+        set('thighs', k, skin)
+        set('shins', k, socks)
         set('boots', k, (h >> 5) % 3 === 0 ? '#f2f2f2' : '#151515')
-        set('arms', k, skin)
-        set('sleeves', k, shirt)
+        set('upperArms', k, shirt)
+        set('foreArms', k, gk ? shirt : skin)
+        set('hands', k, gk ? '#e9ecef' : skin)
       }
       this.bodies.push({ side, x: 0, z: 0, heading: side === 'home' ? Math.PI / 2 : -Math.PI / 2, phase: (h % 100) / 16, amp: 0, speed: 0, has: false })
     })
@@ -660,8 +689,8 @@ export class Stadium {
       const xr = f.x[i]
       if (f.ids[i] !== this.ids[i] || Number.isNaN(xr)) {
         if (b.has) {
-          for (const [part, k] of [['torso', i], ['shorts', i], ['head', i], ['hair', i]] as const) P[part].mesh.setMatrixAt(k, ZERO)
-          for (const part of ['legs', 'socks', 'boots', 'arms', 'sleeves'] as const) {
+          for (const part of SINGLE) P[part].mesh.setMatrixAt(i, ZERO)
+          for (const part of PAIRED) {
             P[part].mesh.setMatrixAt(2 * i, ZERO)
             P[part].mesh.setMatrixAt(2 * i + 1, ZERO)
           }
@@ -693,23 +722,35 @@ export class Stadium {
       b.has = true
 
       const sprint = Math.min(1, b.speed / 8)
-      let swing = Math.sin(b.phase) * (0.7 + 0.25 * sprint) * b.amp
-      let bob = Math.abs(Math.cos(b.phase)) * 0.05 * b.amp
-      const party = this.cheer !== null && this.cheer.side === b.side && t < this.cheer.until
-      const wave = performance.now() / 1000
-      if (party) {
-        // the scoring side celebrates: arms up, jumping
-        bob = Math.abs(Math.sin(wave * 7 + i)) * 0.22
-        swing *= 0.3
-      }
-      // running: legs and arms swing with the stride, more lean and bigger arms when sprinting
-      let legLr = swing
-      let legRr = -swing
-      let armLr = party ? -2.75 + 0.25 * Math.sin(wave * 9 + i) : -swing * (0.8 + 0.5 * sprint)
-      let armRr = party ? -2.75 + 0.25 * Math.cos(wave * 9 + i) : swing * (0.8 + 0.5 * sprint)
-      let pitch = party ? 0 : 0.24 * sprint
+      const a = b.amp
+      const ph = b.phase
+      // running gait: thighs swing, knees fold as the leg comes through, arms drive bent at the elbow
+      const reach = (0.42 + 0.3 * sprint) * a
+      let thighL = -reach * Math.sin(ph)
+      let thighR = reach * Math.sin(ph)
+      let kneeL = a * (0.15 + (0.9 + 0.5 * sprint) * Math.max(0, Math.cos(ph)))
+      let kneeR = a * (0.15 + (0.9 + 0.5 * sprint) * Math.max(0, -Math.cos(ph)))
+      const drive = (0.45 + 0.35 * sprint) * a
+      let armL = drive * Math.sin(ph)
+      let armR = -drive * Math.sin(ph)
+      let elbowL = -(0.25 + 1.15 * a)
+      let elbowR = -(0.25 + 1.15 * a)
+      let bob = Math.abs(Math.cos(ph)) * 0.045 * a
+      let pitch = 0.08 * a + 0.16 * sprint
       let roll = 0
       let drop = 0
+      const party = this.cheer !== null && this.cheer.side === b.side && t >= this.cheer.from && t < this.cheer.until
+      if (party) {
+        // the scoring side celebrates: arms up, jumping
+        const wave = performance.now() / 1000
+        bob = Math.abs(Math.sin(wave * 7 + i)) * 0.2
+        thighL = thighR = 0
+        kneeL = kneeR = 0.15
+        armL = -2.7 + 0.25 * Math.sin(wave * 9 + i)
+        armR = -2.7 + 0.25 * Math.cos(wave * 9 + i)
+        elbowL = elbowR = -0.2
+        pitch = 0
+      }
       // football movements: kicks, tackles, slides, falls, dives
       const act = cues.get(i)
       if (act && !party) {
@@ -717,59 +758,75 @@ export class Stadium {
         const arc = Math.sin(Math.PI * u)
         const hold = Math.max(0, Math.min(1, u / 0.22, (1 - u) / 0.25))
         switch (act.kind) {
-          case 1: // pass: right leg swings through
+          case 1: // pass and
           case 2: {
-            // shot: a bigger swing, leaning back
-            const big = act.kind === 2 ? 1.35 : 1
-            legRr = (0.9 - 2.3 * u) * big
-            legLr = 0.15
-            pitch = -0.12 * big * arc
-            armLr = -0.7 * big * arc
-            armRr = 0.5 * big * arc
+            // shot: the striking leg swings back, then through the ball
+            const big = act.kind === 2 ? 1.3 : 1
+            thighR = (0.65 - 1.9 * u) * big
+            kneeR = u < 0.45 ? 1.3 * big * Math.sin((Math.PI * u) / 0.45) : 0.2
+            thighL = -0.1
+            kneeL = 0.35
+            armL = -0.8 * big * arc
+            armR = 0.6 * big * arc
+            elbowL = elbowR = -0.4
+            pitch = -0.08 * big * arc
             break
           }
-          case 3: // stab tackle
+          case 3: // stab tackle and
           case 5: {
-            // lunge at the ball
+            // lunge: plant one leg, stretch the other at the ball
             const k = act.kind === 3 ? 1 : 0.8
-            pitch = 0.45 * k * arc
-            legRr = -1.35 * k * arc
-            legLr = 0.35 * k * arc
-            drop = 0.14 * k * arc
-            armLr = -0.6 * arc
-            armRr = 0.7 * arc
+            thighR = -1.15 * k * arc
+            kneeR = 0.15
+            thighL = 0.25 * k * arc
+            kneeL = 0.9 * k * arc
+            pitch = 0.35 * k * arc
+            drop = 0.16 * k * arc
+            armL = -0.7 * arc
+            armR = 0.8 * arc
             break
           }
           case 4: // slide tackle: down on the hip, legs first
-            roll = (i % 2 ? 1 : -1) * 1.15 * hold
-            drop = 0.6 * hold
-            pitch = -0.35 * hold
-            legRr = -1.5 * hold
-            legLr = -1.15 * hold
-            armLr = 0.9 * hold
-            armRr = 0.5 * hold
+            roll = (i % 2 ? 1 : -1) * 1.2 * hold
+            drop = 0.62 * hold
+            pitch = -0.4 * hold
+            thighR = -1.35 * hold
+            thighL = -1.0 * hold
+            kneeR = 0.1
+            kneeL = 0.5 * hold
+            armL = 0.9 * hold
+            armR = 0.4 * hold
             break
-          case 6: // fouled: goes down, then gets up
-            pitch = 1.45 * Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
-            drop = 0.7 * Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
-            armLr = -1.7 * hold
-            armRr = -1.6 * hold
-            legLr = legRr = 0
+          case 6: {
+            // fouled: goes down, then gets up
+            const down = Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
+            pitch = 1.45 * down
+            drop = 0.72 * down
+            armL = -1.6 * down
+            armR = -1.5 * down
+            elbowL = elbowR = -0.6 * down
+            thighL = thighR = 0.1 * down
+            kneeL = kneeR = 0.3 * down
             break
-          case 7: // goalkeeper dive, towards +y or -y of the pitch
+          }
+          case 7: // goalkeeper dive towards +y or -y of the pitch
           case 8: {
             const toward = act.kind === 7 ? 1 : -1
             roll = Math.sign(Math.sin(b.heading) || 1) * toward * 1.35 * hold
             drop = -0.45 * arc
-            armLr = armRr = -2.9 * hold
-            legLr = 0.2 * hold
-            legRr = -0.2 * hold
+            armL = armR = -2.9 * hold
+            elbowL = elbowR = -0.1
+            thighL = 0.2 * hold
+            thighR = -0.25 * hold
+            kneeL = kneeR = 0.3 * hold
             break
           }
           case 9: // block: spread out, arms tucked
-            legLr = -0.55 * arc
-            legRr = 0.55 * arc
-            armLr = armRr = 0.15
+            thighL = -0.45 * arc
+            thighR = 0.45 * arc
+            kneeL = kneeR = 0.4 * arc
+            armL = armR = 0.1
+            elbowL = elbowR = -1.6
             pitch = 0.2 * arc
             break
         }
@@ -779,27 +836,33 @@ export class Stadium {
       if (roll) tmpB.multiply(tmpM.makeRotationZ(roll))
       tmpB.multiply(tmpM.makeRotationX(pitch))
       let slot = 0
-      const at = (ox: number, oy: number, rotX: number) => {
-        const m = POOL[slot++].makeTranslation(ox, oy, 0)
+      // a joint: start from `parent`, move to (ox, oy), then bend by `rotX`
+      const joint = (parent: THREE.Matrix4, ox: number, oy: number, rotX: number, rotZ = 0) => {
+        const m = POOL[slot++].copy(parent).multiply(tmpM.makeTranslation(ox, oy, 0))
+        if (rotZ) m.multiply(tmpM.makeRotationZ(rotZ))
         if (rotX) m.multiply(tmpM.makeRotationX(rotX))
-        return m.premultiply(tmpB)
+        return m
       }
-      P.torso.mesh.setMatrixAt(i, at(0, 1.31, 0))
-      P.shorts.mesh.setMatrixAt(i, at(0, 0.92, 0))
-      const head = at(0, 1.74, 0)
+      P.torso.mesh.setMatrixAt(i, joint(tmpB, 0, HIP, 0))
+      P.shorts.mesh.setMatrixAt(i, joint(tmpB, 0, HIP - 0.17, 0))
+      P.neck.mesh.setMatrixAt(i, joint(tmpB, 0, HIP + 0.56, 0))
+      const head = joint(tmpB, 0, HIP + 0.69, 0)
       P.head.mesh.setMatrixAt(i, head)
       P.hair.mesh.setMatrixAt(i, head)
-      const legL = at(-0.11, 0.88, legLr)
-      const legR = at(0.11, 0.88, legRr)
-      const armL = at(-0.3, 1.52, armLr)
-      const armR = at(0.3, 1.52, armRr)
-      for (const part of ['legs', 'socks', 'boots'] as const) {
-        P[part].mesh.setMatrixAt(2 * i, legL)
-        P[part].mesh.setMatrixAt(2 * i + 1, legR)
-      }
-      for (const part of ['arms', 'sleeves'] as const) {
-        P[part].mesh.setMatrixAt(2 * i, armL)
-        P[part].mesh.setMatrixAt(2 * i + 1, armR)
+      for (const [k, side, thigh, knee, arm, elbow] of [
+        [2 * i, -1, thighL, kneeL, armL, elbowL],
+        [2 * i + 1, 1, thighR, kneeR, armR, elbowR],
+      ] as const) {
+        const hip = joint(tmpB, side * 0.1, HIP, thigh)
+        P.thighs.mesh.setMatrixAt(k, hip)
+        const shin = joint(hip, 0, -THIGH, knee)
+        P.shins.mesh.setMatrixAt(k, shin)
+        P.boots.mesh.setMatrixAt(k, shin)
+        const shoulder = joint(tmpB, side * 0.245, SHOULDER, arm, side * (0.1 + 0.08 * a))
+        P.upperArms.mesh.setMatrixAt(k, shoulder)
+        const fore = joint(shoulder, 0, -UPPER_ARM, elbow)
+        P.foreArms.mesh.setMatrixAt(k, fore)
+        P.hands.mesh.setMatrixAt(k, fore)
       }
     }
     for (const part of Object.values(P)) part.mesh.instanceMatrix.needsUpdate = true
@@ -807,10 +870,14 @@ export class Stadium {
     // ball: lifted by its height, spinning with its speed, with a marker on the grass
     const prevX = this.ball.position.x
     const prevZ = this.ball.position.z
-    this.ball.position.set(bx, BALL_R + f.ballZ, bz)
+    const cam = this.camera.position
+    const bs = Math.max(0.36, Math.min(1, Math.hypot(cam.x - bx, cam.y, cam.z - bz) / 60))
+    this.ball.scale.setScalar(bs)
+    this.ball.position.set(bx, BALL_R * bs + f.ballZ, bz)
     const travel = Math.hypot(bx - prevX, bz - prevZ)
-    if (travel < 5) this.ball.rotation.x += travel / BALL_R
+    if (travel < 5) this.ball.rotation.x += travel / (BALL_R * bs)
     this.ballMark.position.set(bx, 0.03, bz)
+    this.ballMark.scale.setScalar(bs)
     ;(this.ballMark.material as THREE.MeshBasicMaterial).opacity = Math.max(0.12, 0.38 - f.ballZ * 0.03)
 
     // the player on the ball: a ring on the grass and a name tag
@@ -859,10 +926,9 @@ export class Stadium {
     if (!live) this.xgTag.visible = false
 
     // a goal: the scoring end jumps
-    if (cur?.type === 'shot' && cur.outcome === 'goal') {
-      const since = t - (cur.ts + cur.dur)
-      if (since > 0 && since < 0.6 && !this.cheer) this.cheer = { side: cur.team, until: t + 6 }
-    }
+    // (tied to match time, so it holds after a seek or fast-forward and never shows before the ball is in)
+    const scored = this.goalsIn.find((g) => t >= g.from && t < g.from + 7)
+    if (scored && this.cheer?.from !== scored.from) this.cheer = { side: scored.side, from: scored.from, until: scored.from + 7 }
 
     // hover: name, number and speed
     this.hoverIdx = -1
@@ -937,9 +1003,10 @@ export class Stadium {
       }
       case 'replay': {
         const dir = this.override?.dir ?? 1
-        pos.set(dir * (L / 2 + 3.6), 2.6, Math.max(-9, Math.min(9, ball.z * 0.5)) + 2.5)
-        look.set(ball.x, 1, ball.z)
-        fov = 52
+        // raised behind the goal, so the crossbar and net never block the view
+        pos.set(dir * (L / 2 + 6.5), 6.8, Math.max(-8, Math.min(8, ball.z * 0.4)))
+        look.set(ball.x - dir * 2, 0.6, ball.z * 0.9)
+        fov = 46
         break
       }
       case 'celebrate': {
@@ -990,7 +1057,8 @@ export class Stadium {
 
   private updateCrowd(now: number) {
     if (!this.crowd || !this.cheer) return
-    const active = this.clock.time < this.cheer.until
+    const mt = this.clock.time
+    const active = mt >= this.cheer.from && mt < this.cheer.until
     const s = now / 1000
     this.crowdBase.forEach((b, i) => {
       if (b.side !== this.cheer!.side) return
@@ -999,7 +1067,7 @@ export class Stadium {
       this.crowd!.setMatrixAt(i, tmpM)
     })
     this.crowd.instanceMatrix.needsUpdate = true
-    if (!active) this.cheer = null
+    if (mt >= this.cheer.until || mt < this.cheer.from - 15) this.cheer = null
   }
 }
 

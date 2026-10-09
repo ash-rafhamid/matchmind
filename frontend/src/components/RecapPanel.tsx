@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useMatch } from '../lib/match'
 import { useSettings } from '../lib/settings'
+import { stripTags } from '../lib/ui'
 import type { CrewResult } from '../types'
 import StoryText from './StoryText'
 import { TraceButton, VerifiedBadge } from './Trace'
@@ -51,7 +52,7 @@ export default function RecapPanel() {
                 <button
                   className="act mt-1"
                   onClick={() => {
-                    navigator.clipboard?.writeText(s.replace(/\s*\[#\d+\]/g, ''))
+                    navigator.clipboard?.writeText(stripTags(s))
                     setCopied(i)
                     setTimeout(() => setCopied(null), 1400)
                   }}

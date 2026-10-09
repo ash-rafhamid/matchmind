@@ -1,3 +1,5 @@
+import { stripTags } from './ui'
+
 const VOICE_LANG: Record<string, string> = {
   en: 'en-GB', es: 'es-ES', fr: 'fr-FR', pt: 'pt-BR', de: 'de-DE', ar: 'ar-SA', hi: 'hi-IN', bn: 'bn-IN', sw: 'sw-KE', ja: 'ja-JP',
 }
@@ -8,7 +10,7 @@ export const speechAvailable = typeof window !== 'undefined' && 'speechSynthesis
 export function speak(text: string, lang: string, onEnd?: () => void): void {
   if (!speechAvailable) return
   window.speechSynthesis.cancel()
-  const clean = text.replace(/\[#\d+\]/g, '').replace(/\s+/g, ' ')
+  const clean = stripTags(text)
   const u = new SpeechSynthesisUtterance(clean)
   u.lang = VOICE_LANG[lang] ?? 'en-GB'
   const voice = window.speechSynthesis.getVoices().find((v) => v.lang === u.lang)
