@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import os
@@ -13,7 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
@@ -27,6 +28,8 @@ from .ai.packets import moment_packet, recap_packet  # noqa: E402
 from .ai.personas import LANGUAGES, PERSONAS  # noqa: E402
 from .engine.formations import FORMATIONS  # noqa: E402
 from .engine.sim import TacticalChange  # noqa: E402
+from .export import build_export  # noqa: E402
+from .live import live_feed  # noqa: E402
 from .mcp_server import mcp  # noqa: E402
 from .whatif import DIALS, run_what_if  # noqa: E402
 
@@ -164,24 +167,49 @@ def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int =
             "xy": xy.reshape(-1).tolist(), "ball": ball.reshape(-1).tolist(), "scale": 10}
 
 
+_inflight: dict[str, asyncio.Task] = {}
+
+
+async def _cached_job(key: str, make_job, client_key: str | None) -> dict:
+    """Serve from cache, join an identical in-flight job, or run the crew once and cache verified AI output."""
+    if cached := _cache_get(key):
+        return cached | {"cached": True}
+    if key in _inflight:
+        return await asyncio.shield(_inflight[key])
+    if CREW.ai_enabled and client_key:
+        AI_LIMIT.check(client_key)
+
+    async def run() -> dict:
+        out = _result_dict(await CREW.run_job(make_job()))
+        if out["mode"] == "ai" or not CREW.ai_enabled:
+            _cache_put(key, out)
+        return out
+
+    task = asyncio.create_task(run())
+    _inflight[key] = task
+    task.add_done_callback(lambda _: _inflight.pop(key, None))
+    return await asyncio.shield(task)
+
+
+def _moment_or_404(pkg: dict, moment_id: str) -> dict:
+    moment = next((m for m in pkg["analytics"]["moments"] if m["id"] == moment_id), None)
+    if moment is None:
+        raise HTTPException(404, f"no moment {moment_id}")
+    return moment
+
+
+async def _moment_story(pkg: dict, moment: dict, persona: str, lang: str, client_key: str | None) -> dict:
+    key = _key("moment", pkg["meta"]["id"], moment["id"], persona, lang)
+    return await _cached_job(key, lambda: Job("moment", moment_packet(pkg, moment), persona, lang,
+                                              store.LEAGUE_ROSTER), client_key)
+
+
 @app.get("/api/matches/{match_id}/moments/{moment_id}/story")
 async def moment_story(match_id: str, moment_id: str, request: Request, persona: str = "fan",
                        lang: str = "en") -> dict:
     _check_audience(persona, lang)
     pkg = _load(match_id)
-    moment = next((m for m in pkg["analytics"]["moments"] if m["id"] == moment_id), None)
-    if moment is None:
-        raise HTTPException(404, f"no moment {moment_id}")
-    key = _key("moment", match_id, moment_id, persona, lang)
-    if cached := _cache_get(key):
-        return cached | {"cached": True}
-    if CREW.ai_enabled:
-        AI_LIMIT.check(_client_key(request))
-    job = Job("moment", moment_packet(pkg, moment), persona, lang, store.LEAGUE_ROSTER)
-    out = _result_dict(await CREW.run_job(job))
-    if out["mode"] == "ai" or not CREW.ai_enabled:
-        _cache_put(key, out)
-    return out
+    return await _moment_story(pkg, _moment_or_404(pkg, moment_id), persona, lang, _client_key(request))
 
 
 @app.get("/api/matches/{match_id}/recap")
@@ -189,15 +217,35 @@ async def recap(match_id: str, request: Request, persona: str = "fan", lang: str
     _check_audience(persona, lang)
     pkg = _load(match_id)
     key = _key("recap", match_id, persona, lang)
-    if cached := _cache_get(key):
-        return cached | {"cached": True}
+    return await _cached_job(key, lambda: Job("recap", recap_packet(pkg), persona, lang, store.LEAGUE_ROSTER),
+                             _client_key(request))
+
+
+@app.get("/api/matches/{match_id}/live")
+async def live(match_id: str, request: Request, persona: str = "fan", lang: str = "en", speed: float = 8.0,
+               start: float = 0.0) -> StreamingResponse:
+    """Server-Sent Events feed of the match in accelerated real time, with crew stories as moments happen."""
+    _check_audience(persona, lang)
+    pkg = _load(match_id)
     if CREW.ai_enabled:
         AI_LIMIT.check(_client_key(request))
-    job = Job("recap", recap_packet(pkg), persona, lang, store.LEAGUE_ROSTER)
-    out = _result_dict(await CREW.run_job(job))
-    if out["mode"] == "ai" or not CREW.ai_enabled:
-        _cache_put(key, out)
-    return out
+    speed = max(1.0, min(speed, 60.0))
+
+    async def story(moment: dict) -> dict:
+        out = await _moment_story(pkg, moment, persona, lang, None)
+        return {k: out[k] for k in ("text", "verdict", "mode")} | {"agents": [t["agent"] for t in out["trace"]]}
+
+    stream = live_feed(match_id, speed, max(0.0, start), story, request.is_disconnected)
+    return StreamingResponse(stream, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/matches/{match_id}/export.zip")
+def export(match_id: str) -> Response:
+    """The full synthetic dataset for one match: events, tracking, analytics and a data card."""
+    _load(match_id)
+    return Response(build_export(match_id), media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="matchmind-{match_id}.zip"'})
 
 
 class AskBody(BaseModel):
@@ -237,15 +285,8 @@ async def whatif(match_id: str, body: WhatIfBody, request: Request) -> dict:
     out: dict = {"result": result}
     if body.explain:
         key = _key("whatif", match_id, json.dumps(body.model_dump(), sort_keys=True))
-        cached = _cache_get(key)
-        if cached is None:
-            if CREW.ai_enabled:
-                AI_LIMIT.check(_client_key(request))
-            cached = _result_dict(await CREW.run_job(Job("whatif", result, body.persona, body.lang,
-                                                         store.LEAGUE_ROSTER)))
-            if cached["mode"] == "ai" or not CREW.ai_enabled:
-                _cache_put(key, cached)
-        out["explanation"] = cached
+        out["explanation"] = await _cached_job(
+            key, lambda: Job("whatif", result, body.persona, body.lang, store.LEAGUE_ROSTER), _client_key(request))
     return out
 
 

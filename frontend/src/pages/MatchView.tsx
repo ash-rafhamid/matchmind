@@ -1,4 +1,4 @@
-import { BarChart3, FlaskConical, Loader2, MessageCircleQuestion, Newspaper, Radio, X } from 'lucide-react'
+import { BarChart3, Download, FlaskConical, Loader2, MessageCircleQuestion, Newspaper, Radio, Tv, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
@@ -126,6 +126,31 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 }
 
 function TeamStrip() {
+  const { pkg } = useMatch()
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 text-xs">
+        <a
+          href={`#/studio/${pkg.meta.id}`}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 hover:border-mint-500/60"
+        >
+          <Tv size={14} className="text-mint-400" /> Studio overlay (live feed)
+        </a>
+        <a
+          href={`/api/matches/${pkg.meta.id}/export.zip`}
+          className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 hover:border-mint-500/60"
+        >
+          <Download size={14} className="text-mint-400" /> Download dataset (events + 10 Hz tracking)
+        </a>
+      </div>
+      <TeamCards />
+    </div>
+  )
+}
+
+function TeamCards() {
   const { pkg } = useMatch()
   return (
     <div className="grid gap-3 text-xs sm:grid-cols-2">
