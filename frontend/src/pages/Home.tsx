@@ -3,6 +3,7 @@ import { api } from '../api'
 import { formatClock, PlaybackClock, useClock } from '../lib/clock'
 import { scoreAt } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
+import { buildReel, ReelDirector, type ReelState } from '../lib/reel'
 import { TrackingStore } from '../lib/tracking'
 import { onPrimary } from '../lib/ui'
 import type { MatchPackage, MatchSummary } from '../types'
@@ -63,24 +64,26 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
   const store = useMemo(() => (pkg ? new TrackingStore(pkg.meta.id) : null), [pkg])
   const t = useT()
 
+  const [reel, setReel] = useState<ReelState | null>(null)
+  const [replayDir, setReplayDir] = useState<1 | -1 | null>(null)
+
   useEffect(() => {
     if (!clock || !pkg || !store) return
-    // start just before the first goal, at a gentle 3x, and loop
-    const firstGoal = pkg.events.find((e) => e.type === 'goal')
-    const start = Math.max(0, (firstGoal?.ts ?? 300) - 40)
-    store.prefetch(start)
-    clock.seek(start)
-    clock.setSpeed(3)
-    const t = window.setTimeout(() => clock.play(), 600)
-    const loop = clock.subscribe(() => {
-      if (!clock.playing && clock.time >= pkg.meta.duration_s - 1) {
-        clock.seek(start)
-        clock.play()
-      }
+    // the front page plays the match's highlights on a loop: build-ups at real speed, goals replayed
+    clock.waitFor = (time) => store.ready(time)
+    const director = new ReelDirector(clock, store, buildReel(pkg))
+    const unsub = director.subscribe((s) => {
+      setReel(s)
+      setReplayDir(s.phase === 'replay' && s.clip?.goal ? (s.clip.goal.team === 'home' ? 1 : -1) : null)
+      if (s.phase === 'done') window.setTimeout(() => (clock.seek(0), director.start()), 1500)
     })
+    director.onExit = () => director.start()
+    store.prefetch(0)
+    const t = window.setTimeout(() => director.start(), 400)
     return () => {
       clearTimeout(t)
-      loop()
+      unsub()
+      director.stop()
       clock.destroy()
     }
   }, [clock, pkg, store])
@@ -89,7 +92,7 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
     <section className="relative h-[calc(100vh-52px)] min-h-[560px] overflow-hidden bg-ink">
       {pkg && clock && store ? (
         <Suspense fallback={null}>
-          <Miniature pkg={pkg} store={store} clock={clock} mode="director" className="absolute inset-0" />
+          <Miniature pkg={pkg} store={store} clock={clock} mode="director" replay={replayDir} className="absolute inset-0" />
         </Suspense>
       ) : (
         <div className="absolute inset-0 grid place-items-center">
@@ -97,7 +100,7 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(11,12,14,0.78)_0%,rgba(11,12,14,0.35)_38%,transparent_62%),linear-gradient(0deg,rgba(11,12,14,0.55)_0%,transparent_35%)]" />
-      {pkg && clock && <OnAir pkg={pkg} clock={clock} />}
+      {pkg && clock && <OnAir pkg={pkg} clock={clock} replay={reel?.phase === 'replay'} />}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-10 sm:px-10 sm:pb-14">
         <div className="pointer-events-auto max-w-[760px] text-white">
           <div className="flex items-stretch">
@@ -128,7 +131,7 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
   )
 }
 
-function OnAir({ pkg, clock }: { pkg: MatchPackage; clock: PlaybackClock }) {
+function OnAir({ pkg, clock, replay }: { pkg: MatchPackage; clock: PlaybackClock; replay: boolean }) {
   const { time } = useClock(clock, 4)
   const score = scoreAt(pkg.events, time)
   const { home, away } = pkg.meta.teams
@@ -136,7 +139,7 @@ function OnAir({ pkg, clock }: { pkg: MatchPackage; clock: PlaybackClock }) {
   return (
     <div className="absolute top-4 right-4 flex h-9 items-stretch shadow-[0_6px_24px_rgba(0,0,0,0.35)] sm:top-6 sm:right-6">
       <span className="cut-l flex items-center gap-2 bg-flare pr-3 pl-4 cond text-white">
-        <span className="live-pip !bg-white" /> {t('home.onAir')}
+        <span className="live-pip !bg-white" /> {replay ? t('reel.replay') : t('home.onAir')}
       </span>
       <span className="flex items-center px-3 xp text-[14px]" style={{ background: home.primary, color: onPrimary(home) }}>
         {home.short}

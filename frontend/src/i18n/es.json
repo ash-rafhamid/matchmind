@@ -229,5 +229,21 @@
  "title.save": "Buena parada de {player}",
  "title.red_card": "Tarjeta roja - {player}",
  "title.tactical_change": "{team} cambia de táctica",
- "title.momentum": "{team} toma el control"
+ "title.momentum": "{team} toma el control",
+ "mode.highlights": "Lo mejor",
+ "mode.full": "Partido completo",
+ "mode.help": "Lo mejor: cada gran momento a velocidad real, con repeticiones",
+ "sound.on": "Sonido del estadio activado",
+ "sound.off": "Sonido del estadio desactivado",
+ "buffering": "Cargando los próximos momentos",
+ "reel.replay": "Repetición",
+ "reel.slowmo": "cámara lenta",
+ "reel.clip": "Clip {n} de {total}",
+ "reel.done": "Eso es todo lo mejor.",
+ "reel.watchFull": "Ver el partido completo",
+ "reel.again": "Reproducir lo mejor otra vez",
+ "reel.kickoff": "Saque inicial",
+ "reel.chance": "Oportunidad",
+ "reel.second_half": "Segunda parte",
+ "reel.fulltime": "Final del partido"
 }

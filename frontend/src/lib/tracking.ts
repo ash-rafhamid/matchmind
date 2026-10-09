@@ -78,6 +78,16 @@ export class TrackingStore {
     this.ensure(idx + 1)
   }
 
+  /** Is the data for time t here (plus a little look-ahead)? Keeps fetching ahead of the playhead. */
+  ready(t: number): boolean {
+    const idx = Math.floor(Math.max(0, t) / CHUNK_SECONDS)
+    this.ensure(idx)
+    this.ensure(idx + 1)
+    this.ensure(idx + 2)
+    const c = this.chunks.get(idx)
+    return !!c && c !== 'loading'
+  }
+
   private chunk(t: number): Chunk | null {
     const c = this.chunks.get(Math.floor(t / CHUNK_SECONDS))
     return c && c !== 'loading' && c.frames > 0 ? c : null
@@ -105,7 +115,8 @@ export class TrackingStore {
     t = Math.max(0, t)
     const idx = Math.floor(t / CHUNK_SECONDS)
     this.ensure(idx)
-    if (t - idx * CHUNK_SECONDS > CHUNK_SECONDS * 0.4) this.ensure(idx + 1)
+    this.ensure(idx + 1)
+    if (t - idx * CHUNK_SECONDS > CHUNK_SECONDS * 0.4) this.ensure(idx + 2)
     const c = this.chunk(t)
     if (!c) return null
     const n = c.players.length

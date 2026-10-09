@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react'
 export class PlaybackClock {
   time = 0
   playing = false
-  speed = 8
+  speed = 1
+  /** True while playback is held because the data for the next moments has not arrived yet. */
+  buffering = false
+  /** Return false to hold the clock (like a video player buffering) until data for time t is ready. */
+  waitFor: ((t: number) => boolean) | null = null
   readonly duration: number
   private listeners = new Set<() => void>()
   private last = 0
@@ -28,7 +32,17 @@ export class PlaybackClock {
     if (!this.playing) return
     const dt = Math.min(0.1, (now - this.last) / 1000)
     this.last = now
-    this.time = Math.min(this.duration, this.time + dt * this.speed)
+    const next = Math.min(this.duration, this.time + dt * this.speed)
+    const ready = !this.waitFor || this.waitFor(next)
+    if (ready !== !this.buffering) {
+      this.buffering = !ready
+      this.emit()
+    }
+    if (!ready) {
+      this.raf = requestAnimationFrame(this.tick)
+      return
+    }
+    this.time = next
     if (this.stopAt !== null && this.time >= this.stopAt) {
       this.time = this.stopAt
       this.stopAt = null

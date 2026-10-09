@@ -330,18 +330,27 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
     changes = [e for e in events if e["type"] in ("substitution", "card", "tactical_change")]
     cuts = [0.0] + [e["ts"] for e in changes] + [n * DT]
     targets = np.full((n, P, 2), np.nan)
+    lag = rng.integers(3, 10, size=P)  # 0.3-0.9 s reaction time, per player
+    follow_gain = rng.uniform(0.7, 1.15, size=P)
     for seg in range(len(cuts) - 1):
         if seg > 0:
             _apply_change(changes[seg - 1], slots, dna, anchors, col)
         f0, f1 = int(round(cuts[seg] * HZ)), min(n, int(round(cuts[seg + 1] * HZ)))
         if f1 <= f0:
             continue
+        frames = np.arange(f0, f1)
         for side in ("home", "away"):
             is_home = side == "home"
-            ball_x = bx[f0:f1] if is_home else PITCH_LENGTH - bx[f0:f1]
-            ball_y = by[f0:f1] if is_home else PITCH_WIDTH - by[f0:f1]
-            in_poss = poss_home[f0:f1] if is_home else ~poss_home[f0:f1]
             for pid, (role, sx, sy) in slots[side].items():
+                # every player reads the game a little late, and not all at the same moment
+                seen = np.maximum(frames - lag[col[pid]], 0)
+                ball_x = bx[seen] if is_home else PITCH_LENGTH - bx[seen]
+                ball_y = by[seen] if is_home else PITCH_WIDTH - by[seen]
+                # and each follows the ball by their own amount
+                g = follow_gain[col[pid]]
+                ball_x = PITCH_LENGTH / 2 + (ball_x - PITCH_LENGTH / 2) * g
+                ball_y = GOAL_Y + (ball_y - GOAL_Y) * g
+                in_poss = poss_home[seen] if is_home else ~poss_home[seen]
                 x, y = _shape(sx, sy, role, ball_x, ball_y, in_poss, dna[side]["width"], dna[side]["line_height"])
                 if role != "GK":
                     x = np.where(own_half[f0:f1], np.minimum(x, PITCH_LENGTH / 2 - 1.0), x)
@@ -349,6 +358,34 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
                     x, y = PITCH_LENGTH - x, PITCH_WIDTH - y
                 targets[f0:f1, col[pid], 0] = x
                 targets[f0:f1, col[pid], 1] = y
+
+    # Off-the-ball runs: when their team has the ball, attackers and midfielders now and then
+    # make a run of 6-14 m into space over 3-5 s, then drift back into the shape.
+    roles = {}
+    for side in ("home", "away"):
+        for pid, (role, _, _) in slots[side].items():
+            roles[col[pid]] = role
+    for j in range(P):
+        role = roles.get(j, "DEF")
+        group = role_group(role) if role != "GK" else "GK"
+        if group not in ("ATT", "MID"):
+            continue
+        attack_dir = 1.0 if sides[j] == "home" else -1.0
+        mine = poss_home if sides[j] == "home" else ~poss_home
+        t = 0.0
+        while True:
+            t += rng.uniform(12, 30 if group == "ATT" else 40)
+            f0 = int(t * HZ)
+            dur = int(rng.uniform(3, 5) * HZ)
+            if f0 + dur >= n:
+                break
+            if not mine[f0]:
+                continue
+            ang = rng.uniform(-0.6, 0.6)
+            amp = rng.uniform(6, 14)
+            w = np.sin(np.linspace(0, np.pi, dur)) ** 2
+            targets[f0:f0 + dur, j, 0] += attack_dir * np.cos(ang) * amp * w
+            targets[f0:f0 + dur, j, 1] += np.sin(ang) * amp * w
 
     # A little individual drift so the shape breathes like real players do.
     drift = np.cumsum(rng.normal(0, 0.06, size=(n, P, 2)), axis=0)
@@ -389,7 +426,7 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
         f = min(n - 1, int(round(t1 * HZ)))
         anchors[j].append((t1, *feet(float(bx[f]), float(by[f]), sides[j])))
 
-    shape_path = _follow(targets, np.array(pace), period_starts)
+    shape_path = _follow(targets, np.array(pace), period_starts, rng)
     xy = np.empty((n, P, 2))
     for j in range(P):
         path = np.stack([_smooth_pieces(shape_path[:, j, 0], 4, period_starts),
@@ -428,14 +465,15 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
                     bz.astype(np.float32), owner, vmax)
 
 
-def _follow(targets: np.ndarray, pace: np.ndarray, resets: list[int]) -> np.ndarray:
-    """Players move towards their shape targets like athletes: capped speed and acceleration.
+def _follow(targets: np.ndarray, pace: np.ndarray, resets: list[int], rng: np.random.Generator) -> np.ndarray:
+    """Players move towards their shape targets like athletes: capped speed and acceleration,
+    each with their own engine, and nobody shuffles when they are already roughly in position.
 
     At `resets` (the start of a half, after the interval) everyone starts in their kick-off position."""
     resets_set = set(resets)
     n, P, _ = targets.shape
-    vcap = 4.2 + 3.0 * pace / 100  # a team keeps its shape at a jog-to-run, not a sprint
-    acc = 2.8 * DT
+    vcap = (4.2 + 3.0 * pace / 100) * rng.uniform(0.9, 1.1, size=P)  # a team keeps its shape at a jog-to-run
+    acc = (2.8 * DT) * rng.uniform(0.85, 1.15, size=P)
     pos = np.where(np.isnan(targets[0]), 0.0, targets[0])
     vel = np.zeros((P, 2))
     out = np.empty_like(targets)
@@ -448,14 +486,17 @@ def _follow(targets: np.ndarray, pace: np.ndarray, resets: list[int]) -> np.ndar
             new = on
         pos[new] = tgt[new]
         vel[new] = 0.0
-        desired = np.where(on[:, None], (tgt - pos) * 1.1, 0.0)
+        gap = np.where(on[:, None], tgt - pos, 0.0)
+        # stand still inside ~0.8 m of where you should be; move with purpose beyond ~2 m
+        dist = np.linalg.norm(gap, axis=1)
+        desired = gap * 1.1 * np.clip((dist - 0.8) / 1.2, 0.0, 1.0)[:, None]
         speed = np.linalg.norm(desired, axis=1)
         over = speed > vcap
         desired[over] *= (vcap[over] / speed[over])[:, None]
         dv = desired - vel
         dvn = np.linalg.norm(dv, axis=1)
         big = dvn > acc
-        dv[big] *= (acc / dvn[big])[:, None]
+        dv[big] *= (acc[big] / dvn[big])[:, None]
         vel += dv
         pos = pos + vel * DT
         out[f] = np.where(on[:, None], pos, np.nan)

@@ -1,13 +1,14 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
-import { CameraSwitch, GoalTakeover, LowerThird, ScoreBug, Transport, useCrossings } from '../components/Broadcast'
+import { CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, ScoreBug, Transport, useAtmosphere, useCrossings, type PlayMode } from '../components/Broadcast'
 import CrewFeed from '../components/CrewFeed'
 import RecapPanel from '../components/RecapPanel'
 import StatsPanel from '../components/StatsPanel'
 import WhatIfPanel from '../components/WhatIfPanel'
 import { PlaybackClock } from '../lib/clock'
 import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
+import { buildReel, ReelDirector, type ReelState } from '../lib/reel'
 import { TrackingStore } from '../lib/tracking'
 import { useT } from '../lib/settings'
 import { onPrimary } from '../lib/ui'
@@ -53,6 +54,45 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const t = useT()
 
   useEffect(() => () => clock.destroy(), [clock])
+
+  // like a video player: hold the clock while the next minute of tracking is still on its way
+  useEffect(() => {
+    clock.waitFor = (t) => store.ready(t)
+    return () => {
+      clock.waitFor = null
+    }
+  }, [clock, store])
+
+  // highlights by default: the AI director cuts the match like TV, with goal replays
+  const director = useMemo(() => new ReelDirector(clock, store, buildReel(pkg)), [clock, store, pkg])
+  const [mode, setModeState] = useState<PlayMode>('highlights')
+  const [reel, setReel] = useState<ReelState>(() => director.state())
+  const [sound, setSound] = useState(false)
+  const replaying = useRef(false)
+  replaying.current = reel.phase === 'replay' || (reel.phase === 'cut' && reel.cutTo === 'replay')
+  useEffect(() => director.subscribe(setReel), [director])
+  useEffect(() => {
+    director.onExit = () => setModeState('full')
+    return () => director.stop()
+  }, [director])
+
+  const setMode = (m: PlayMode) => {
+    setModeState(m)
+    if (m === 'full') {
+      director.stop()
+    } else {
+      clock.pause()
+      director.start()
+    }
+  }
+  const onPlay = () => {
+    if (mode === 'highlights') {
+      if (reel.phase === 'off' || reel.phase === 'done') director.start()
+      else if (clock.playing) clock.pause()
+      else clock.play()
+    } else clock.toggle()
+  }
+  const replayDir = reel.phase === 'replay' && reel.clip?.goal ? (reel.clip.goal.team === 'home' ? 1 : -1) : null
   useEffect(() => store.prefetch(0), [store])
 
   const focusEvidence = useCallback(
@@ -87,12 +127,13 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 
   return (
     <MatchCtx.Provider value={value}>
-      <CrossingWatch goals={goals} onGoal={setGoal} onMoment={setLower} />
+      <CrossingWatch goals={goals} onGoal={setGoal} onMoment={setLower} muted={replaying} />
+      <AtmosphereWatch on={sound} store={store} replaying={replaying} />
       <div className="grid xl:h-[calc(100vh-52px)] xl:grid-cols-[minmax(0,1fr)_440px]">
         <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
           <div className="relative min-h-[340px] flex-1">
             <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">{t('app.loadingStadium')}</p>}>
-              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} className="absolute inset-0" />
+              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} replay={replayDir} className="absolute inset-0" />
             </Suspense>
             <div className="stage-shade pointer-events-none absolute inset-0" />
             <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
@@ -109,6 +150,16 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               </div>
             </div>
             {goal && <GoalTakeover key={goal.id} goal={goal} />}
+            {mode === 'highlights' && (
+              <ReelOverlay
+                reel={reel}
+                onFull={() => setMode('full')}
+                onAgain={() => {
+                  clock.seek(0)
+                  director.start()
+                }}
+              />
+            )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 sm:p-4">
               {lower && (
                 <LowerThird
@@ -123,7 +174,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               )}
             </div>
           </div>
-          <Transport />
+          <Transport mode={mode} onMode={setMode} onPlay={onPlay} reel={reel} sound={sound} onSound={() => setSound((v) => !v)} />
         </section>
 
         <aside className="plate flex min-h-[640px] min-w-0 flex-col xl:min-h-0">
@@ -173,16 +224,39 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   )
 }
 
-function CrossingWatch({ goals, onGoal, onMoment }: { goals: MatchEvent[]; onGoal: (g: MatchEvent | null) => void; onMoment: (m: Moment) => void }) {
+/** Stadium sound has to live inside the match context, next to the other event watchers. */
+function AtmosphereWatch({ on, store, replaying }: { on: boolean; store: TrackingStore; replaying: { current: boolean } }) {
+  useAtmosphere(on, store, replaying)
+  return null
+}
+
+function CrossingWatch({
+  goals,
+  onGoal,
+  onMoment,
+  muted,
+}: {
+  goals: MatchEvent[]
+  onGoal: (g: MatchEvent | null) => void
+  onMoment: (m: Moment) => void
+  muted: { current: boolean }
+}) {
   const { pkg } = useMatch()
+  // during a replay the GOAL takeover and the caption have already been shown once
   const onCrossGoal = useCallback(
     (e: MatchEvent | Moment) => {
+      if (muted.current) return
       onGoal(e as MatchEvent)
       window.setTimeout(() => onGoal(null), 2600)
     },
-    [onGoal],
+    [onGoal, muted],
   )
-  const onCrossMoment = useCallback((m: MatchEvent | Moment) => onMoment(m as Moment), [onMoment])
+  const onCrossMoment = useCallback(
+    (m: MatchEvent | Moment) => {
+      if (!muted.current) onMoment(m as Moment)
+    },
+    [onMoment, muted],
+  )
   useCrossings(goals, onCrossGoal)
   useCrossings(pkg.analytics.moments, onCrossMoment)
   return null

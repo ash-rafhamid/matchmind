@@ -229,5 +229,21 @@
  "title.save": "تصدي رائع من {player}",
  "title.red_card": "بطاقة حمراء - {player}",
  "title.tactical_change": "{team} يغير الأسلوب",
- "title.momentum": "{team} يسيطر على اللعب"
+ "title.momentum": "{team} يسيطر على اللعب",
+ "mode.highlights": "أبرز اللقطات",
+ "mode.full": "المباراة كاملة",
+ "mode.help": "أبرز اللقطات: كل اللحظات المهمة بسرعة حقيقية، مع الإعادات",
+ "sound.on": "صوت الملعب شغال",
+ "sound.off": "صوت الملعب",
+ "buffering": "جار تحميل اللحظات القادمة",
+ "reel.replay": "إعادة",
+ "reel.slowmo": "بطيء",
+ "reel.clip": "المقطع {n} من {total}",
+ "reel.done": "هذه هي أبرز اللقطات.",
+ "reel.watchFull": "شاهد المباراة كاملة",
+ "reel.again": "شغل أبرز اللقطات مرة ثانية",
+ "reel.kickoff": "انطلاق المباراة",
+ "reel.chance": "فرصة",
+ "reel.second_half": "الشوط الثاني",
+ "reel.fulltime": "نهاية المباراة"
 }

@@ -30,7 +30,7 @@ export default function Timeline() {
   useEffect(
     () =>
       clock.subscribe(() => {
-        const x = (clock.time / dur) * 1000
+        const x = Math.max(0, (clock.time / dur) * 1000)
         head.current?.setAttribute('x', String(x - 1.5))
         shade.current?.setAttribute('width', String(x))
       }),
@@ -71,7 +71,7 @@ export default function Timeline() {
           if (e.key === 'ArrowLeft') clock.seek(time - 30)
         }}
       >
-        <rect ref={shade} x="0" y="0" width={X(time)} height={H} fill="#0b0c0e" fillOpacity="0.04" />
+        <rect ref={shade} x="0" y="0" width={Math.max(0, X(time))} height={H} fill="#0b0c0e" fillOpacity="0.04" />
         {bars.map((b, i) => {
           const h = Math.max(1.5, Math.abs(b.v) * 24)
           const isHome = b.v >= 0

@@ -229,5 +229,21 @@
  "title.save": "দারুণ সেভ {player} থেকে",
  "title.red_card": "লাল কার্ড - {player}",
  "title.tactical_change": "{team} কৌশল বদলালো",
- "title.momentum": "{team} নিয়ন্ত্রণ নিলো"
+ "title.momentum": "{team} নিয়ন্ত্রণ নিলো",
+ "mode.highlights": "হাইলাইটস",
+ "mode.full": "পূর্ণ ম্যাচ",
+ "mode.help": "হাইলাইটস: প্রতিটি বড় মুহূর্ত আসল গতি, রিপ্লের সঙ্গে",
+ "sound.on": "স্টেডিয়াম শব্দ চালু",
+ "sound.off": "স্টেডিয়াম শব্দ",
+ "buffering": "পরবর্তী মুহূর্ত লোড হচ্ছে",
+ "reel.replay": "রিপ্লে",
+ "reel.slowmo": "স্লো মোশন",
+ "reel.clip": "ক্লিপ {n} এর {total}",
+ "reel.done": "এটাই হাইলাইটস।",
+ "reel.watchFull": "পূর্ণ ম্যাচ দেখুন",
+ "reel.again": "হাইলাইটস আবার চালান",
+ "reel.kickoff": "কিক-অফ",
+ "reel.chance": "চান্স",
+ "reel.second_half": "দ্বিতীয়ার্ধ",
+ "reel.fulltime": "পূর্ণ সময়"
 }

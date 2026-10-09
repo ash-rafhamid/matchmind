@@ -229,5 +229,21 @@
  "title.save": "Beau arrêt de {player}",
  "title.red_card": "Carton rouge - {player}",
  "title.tactical_change": "{team} change de tactique",
- "title.momentum": "{team} prend le contrôle"
+ "title.momentum": "{team} prend le contrôle",
+ "mode.highlights": "Temps forts",
+ "mode.full": "Match complet",
+ "mode.help": "Temps forts : chaque moment clé à vitesse réelle, avec ralentis",
+ "sound.on": "Son du stade activé",
+ "sound.off": "Son du stade désactivé",
+ "buffering": "Chargement des prochains moments",
+ "reel.replay": "Rejouer",
+ "reel.slowmo": "ralenti",
+ "reel.clip": "Clip {n} sur {total}",
+ "reel.done": "Voici les temps forts.",
+ "reel.watchFull": "Voir le match complet",
+ "reel.again": "Rejouer les temps forts",
+ "reel.kickoff": "Coup d'envoi",
+ "reel.chance": "Occasion",
+ "reel.second_half": "Deuxième mi-temps",
+ "reel.fulltime": "Fin du match"
 }
