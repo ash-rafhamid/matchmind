@@ -1,24 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
+import { CameraSwitch, GoalTakeover, LowerThird, ScoreBug, Transport, useCrossings } from '../components/Broadcast'
 import CrewFeed from '../components/CrewFeed'
-import Pitch from '../components/Pitch'
 import RecapPanel from '../components/RecapPanel'
-import Scoreboard from '../components/Scoreboard'
 import StatsPanel from '../components/StatsPanel'
-import Timeline from '../components/Timeline'
 import WhatIfPanel from '../components/WhatIfPanel'
-import { PlaybackClock, useClock } from '../lib/clock'
-import { lastEventIndex, MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
+import { PlaybackClock } from '../lib/clock'
+import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
 import { TrackingStore } from '../lib/tracking'
-import { ROMAN, surname } from '../lib/ui'
-import type { MatchPackage, Side } from '../types'
+import { onPrimary } from '../lib/ui'
+import type { CameraMode } from '../scene/Stadium'
+import type { MatchEvent, MatchPackage, Moment, Side } from '../types'
+
+const Miniature = lazy(() => import('../components/Miniature'))
 
 const TABS = [
   ['live', 'Live'],
   ['ask', 'Ask'],
   ['whatif', 'What if'],
-  ['stats', 'Numbers'],
   ['recap', 'Report'],
 ] as const
 
@@ -32,8 +32,13 @@ export default function MatchView({ matchId }: { matchId: string }) {
     api.match(matchId).then(setPkg).catch((e) => setError(String(e.message ?? e)))
   }, [matchId])
 
-  if (error) return <p className="py-16 text-center text-signal">This match could not be found: {error}</p>
-  if (!pkg) return <p className="typing py-16 text-center text-ink-3 italic">Setting the match in type</p>
+  if (error) return <p className="p-10 text-flare">This match could not be found: {error}</p>
+  if (!pkg)
+    return (
+      <div className="grid h-[calc(100vh-52px)] place-items-center bg-ink">
+        <p className="working cond text-volt">Building the stadium</p>
+      </div>
+    )
   return <LoadedMatch pkg={pkg} />
 }
 
@@ -42,7 +47,12 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const store = useMemo(() => new TrackingStore(pkg.meta.id), [pkg.meta.id])
   const [highlight, setHighlight] = useState<number[]>([])
   const [tab, setTab] = useState<Tab>('live')
+  const [cam, setCam] = useState<CameraMode>('director')
+  const [lower, setLower] = useState<Moment | null>(null)
+  const [goal, setGoal] = useState<MatchEvent | null>(null)
+  const [focusMoment, setFocusMoment] = useState<string | null>(null)
   const eventsById = useMemo(() => new Map(pkg.events.map((e) => [e.id, e])), [pkg.events])
+  const goals = useMemo(() => pkg.events.filter((e) => e.type === 'goal'), [pkg.events])
 
   useEffect(() => () => clock.destroy(), [clock])
   useEffect(() => store.prefetch(0), [store])
@@ -57,6 +67,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
       store.prefetch(first - 3)
       if (play) clock.replay(Math.max(0, first - 3), last + 2, 1)
       else clock.seek(Math.max(0, first - 1))
+      if (window.innerWidth < 1280) document.getElementById('stage')?.scrollIntoView({ behavior: 'smooth' })
     },
     [clock, eventsById, store],
   )
@@ -74,154 +85,148 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
     }),
     [pkg, clock, eventsById, highlight, focusEvidence],
   )
+  const highlightEvents = useMemo(() => highlight.map((id) => eventsById.get(id)).filter(Boolean) as MatchEvent[], [highlight, eventsById])
 
   return (
     <MatchCtx.Provider value={value}>
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-4 num text-[11px] text-ink-3 uppercase">
-        <a href="#/" className="link">
-          &larr; All fixtures
-        </a>
-        <span>
-          {pkg.meta.competition} · seed {pkg.meta.seed}
-        </span>
-        <span className="flex gap-4">
-          <a href={`#/studio/${pkg.meta.id}`} target="_blank" rel="noreferrer" className="link">
-            Studio overlay &#8599;
-          </a>
-          <a href={`/api/matches/${pkg.meta.id}/export.zip`} className="link">
-            Dataset &darr;
-          </a>
-        </span>
-      </div>
-      <Scoreboard />
-      <div className="double-rule" />
-
-      <div className="grid gap-8 pt-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(400px,1fr)] xl:gap-10">
-        <section className="min-w-0">
-          <figure className="plate">
-            <span className="crop-b" />
-            <Pitch store={store} />
-            {highlight.length > 0 && (
-              <button onClick={() => setHighlight([])} className="link absolute top-5 right-5 bg-paper px-2 py-1">
-                Clear {highlight.length} annotation{highlight.length > 1 ? 's' : ''} &times;
-              </button>
-            )}
-          </figure>
-          <Transport />
-          <div className="mt-5">
-            <Timeline />
+      <CrossingWatch goals={goals} onGoal={setGoal} onMoment={setLower} />
+      <div className="grid xl:h-[calc(100vh-52px)] xl:grid-cols-[minmax(0,1fr)_440px]">
+        <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
+          <div className="relative min-h-[340px] flex-1">
+            <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">Building the stadium</p>}>
+              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} className="absolute inset-0" />
+            </Suspense>
+            <div className="stage-shade pointer-events-none absolute inset-0" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
+              <div className="pointer-events-auto">
+                <ScoreBug />
+              </div>
+              <div className="pointer-events-auto flex flex-col items-end gap-2">
+                <CameraSwitch mode={cam} onMode={setCam} />
+                {highlight.length > 0 && (
+                  <button onClick={() => setHighlight([])} className="cut-both bg-flare px-3 py-1 cond text-[11px] text-white">
+                    Clear {highlight.length} marker{highlight.length > 1 ? 's' : ''} ✕
+                  </button>
+                )}
+              </div>
+            </div>
+            {goal && <GoalTakeover key={goal.id} goal={goal} />}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 sm:p-4">
+              {lower && (
+                <LowerThird
+                  key={lower.id}
+                  moment={lower}
+                  onDone={() => setLower(null)}
+                  onOpen={() => {
+                    setTab('live')
+                    setFocusMoment(lower.id)
+                  }}
+                />
+              )}
+            </div>
           </div>
-          <p className="mt-4 border-t border-rule pt-2 text-[13px] text-ink-3 italic">
-            <span className="not-italic label mr-2">Fig. 1</span>
-            Reconstruction from 10 Hz synthetic tracking. The ball lifts off its shadow when it is in the air; tails show
-            the last 0.6 s of each run; the dashed line is the pass being played. Hover a player for their name.
-          </p>
-          <TeamSheets />
+          <Transport />
         </section>
 
-        <aside className="flex min-h-[620px] min-w-0 flex-col xl:sticky xl:top-4 xl:h-[calc(100vh-32px)]">
-          <nav className="flex gap-5 overflow-x-auto border-b border-ink" role="tablist" aria-label="Match sections">
-            {TABS.map(([id, label], i) => (
-              <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className="tab">
-                <span className="roman">{ROMAN[i]}.</span>
+        <aside className="plate flex min-h-[640px] min-w-0 flex-col xl:min-h-0">
+          <div className="flex items-center justify-between bg-ink px-5 py-3 text-white">
+            <span className="xp text-[17px]">
+              The crew<span className="xp-light text-white/50"> / on air</span>
+            </span>
+            <span className="cond text-[10px] text-white/45">Producer · Analyst · Tactician · Storyteller · Fact-checker</span>
+          </div>
+          <nav className="flex border-b border-line" role="tablist" aria-label="Crew">
+            {TABS.map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setTab(id)}
+                className={`flex-1 py-3 cond text-[12px] transition-colors ${tab === id ? 'bg-volt text-ink' : 'text-ink-3 hover:bg-concrete hover:text-ink'}`}
+              >
                 {label}
               </button>
             ))}
           </nav>
-          <div className="min-h-0 flex-1 pt-4">
-            {tab === 'live' && <CrewFeed />}
+          <div className="min-h-0 flex-1">
+            {tab === 'live' && <CrewFeed focus={focusMoment} />}
             {tab === 'ask' && <AskPanel />}
             {tab === 'whatif' && <WhatIfPanel />}
-            {tab === 'stats' && <StatsPanel />}
             {tab === 'recap' && <RecapPanel />}
           </div>
+          <div className="flex items-center justify-between border-t border-line px-5 py-2.5">
+            <a href={`#/studio/${pkg.meta.id}`} target="_blank" rel="noreferrer" className="act">
+              Studio overlay ↗
+            </a>
+            <a href={`/api/matches/${pkg.meta.id}/export.zip`} className="act">
+              Dataset ↓
+            </a>
+            <a href="#centre" className="act">
+              Numbers ↓
+            </a>
+          </div>
         </aside>
+      </div>
+      <div id="centre">
+        <StatsPanel />
+        <TeamSheets />
       </div>
     </MatchCtx.Provider>
   )
 }
 
-const SPEEDS = [1, 4, 8, 16, 32]
-const ACTION: Record<string, string> = {
-  pass: 'Pass', carry: 'Carry', shot: 'Shot', interception: 'Interception', tackle: 'Tackle', save: 'Save',
-  clearance: 'Clearance', block: 'Block', foul: 'Foul', card: 'Card', offside: 'Offside', goal: 'Goal',
-}
-
-function Transport() {
-  const { pkg, clock, name } = useMatch()
-  const { time, playing, speed } = useClock(clock, 6)
-  const shown = useMemo(() => pkg.events.filter((e) => e.type in ACTION), [pkg.events])
-  const idx = lastEventIndex(shown, time)
-  const cur = idx >= 0 && time - shown[idx].ts < 3 ? shown[idx] : null
-  const caption = cur
-    ? `${ACTION[cur.type]} · ${surname(name(cur.player))}${cur.receiver ? ` → ${surname(name(cur.receiver))}` : ''}${
-        cur.outcome && !['complete', 'success'].includes(cur.outcome) ? ` (${cur.outcome.replace('_', ' ')})` : ''
-      }`
-    : null
-
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 border-y border-rule py-3">
-      <button className="btn btn-solid min-w-[108px] justify-center" onClick={() => clock.toggle()} aria-label={playing ? 'Pause' : 'Play'}>
-        {playing ? '❚❚ Pause' : '▶ Play'}
-      </button>
-      <button className="link" onClick={() => clock.seek(0)}>
-        ↺ Kick-off
-      </button>
-      <div className="flex items-center gap-1" role="group" aria-label="Playback speed">
-        <span className="label mr-1">Speed</span>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            onClick={() => clock.setSpeed(s)}
-            aria-pressed={speed === s}
-            className={`num px-1.5 py-0.5 text-[13px] ${speed === s ? 'bg-ink text-paper' : 'text-ink-3 hover:text-ink'}`}
-          >
-            ×{s}
-          </button>
-        ))}
-      </div>
-      <div className="ml-auto min-h-[1.5em] text-right text-[15px] text-ink-2 italic" aria-live="off">
-        {caption}
-      </div>
-    </div>
+function CrossingWatch({ goals, onGoal, onMoment }: { goals: MatchEvent[]; onGoal: (g: MatchEvent | null) => void; onMoment: (m: Moment) => void }) {
+  const { pkg } = useMatch()
+  const onCrossGoal = useCallback(
+    (e: MatchEvent | Moment) => {
+      onGoal(e as MatchEvent)
+      window.setTimeout(() => onGoal(null), 2600)
+    },
+    [onGoal],
   )
+  const onCrossMoment = useCallback((m: MatchEvent | Moment) => onMoment(m as Moment), [onMoment])
+  useCrossings(goals, onCrossGoal)
+  useCrossings(pkg.analytics.moments, onCrossMoment)
+  return null
 }
 
 function TeamSheets() {
   const { pkg } = useMatch()
   return (
-    <section className="mt-8">
-      <div className="label label-ink">Team sheets</div>
-      <div className="mt-3 grid gap-8 border-t border-ink pt-4 sm:grid-cols-2">
-        {(['home', 'away'] as Side[]).map((s) => {
-          const t = pkg.meta.teams[s]
-          const byId = new Map(t.players.map((p) => [p.id, p]))
-          return (
-            <div key={s}>
-              <div className="display text-[20px] font-semibold">{t.name}</div>
-              <p className="mt-1 text-[14px] text-ink-3 italic">
-                {t.dna.formation} under {t.coach}
-                {t.traits.length ? ` - ${t.traits.join(', ')}` : ''}.
-              </p>
-              <ol className="mt-3 columns-2 gap-6 text-[14px]">
-                {t.starters.map((pid) => {
-                  const p = byId.get(pid)
-                  return (
-                    <li key={pid} className="flex gap-2 py-0.5">
-                      <span className="num w-6 text-right text-ink-3">{p?.number}</span>
-                      <span className="truncate">{p?.name}</span>
-                    </li>
-                  )
-                })}
-              </ol>
-              <p className="mt-2 text-[13px] text-ink-3">
-                <span className="label mr-1">Subs</span>
-                {t.bench.map((pid) => byId.get(pid)?.name).filter(Boolean).join(', ')}
-              </p>
+    <section className="mx-auto grid max-w-[1480px] gap-6 px-4 pb-16 sm:px-8 md:grid-cols-2">
+      {(['home', 'away'] as Side[]).map((s) => {
+        const t = pkg.meta.teams[s]
+        const byId = new Map(t.players.map((p) => [p.id, p]))
+        return (
+          <div key={s} className="plate p-5">
+            <div className="flex items-stretch">
+              <span className="cut-r px-3 py-1.5 xp text-[16px]" style={{ background: t.primary, color: onPrimary(t) }}>
+                {t.name}
+              </span>
+              <span className="self-center pl-3 cond text-ink-3">
+                {t.dna.formation} · coach {t.coach}
+              </span>
             </div>
-          )
-        })}
-      </div>
+            <p className="mt-3 text-[13px] text-ink-3">{t.traits.length ? t.traits.join(' · ') : 'balanced'}</p>
+            <ol className="mt-3 grid grid-cols-2 gap-x-6 text-[14px]">
+              {t.starters.map((pid) => {
+                const p = byId.get(pid)
+                return (
+                  <li key={pid} className="flex items-center gap-3 border-t border-line py-1.5">
+                    <span className="w-6 text-right font-bold text-ink-3 tab-num">{p?.number}</span>
+                    <span className="truncate font-medium">{p?.name}</span>
+                    <span className="ml-auto cond text-[10px] text-ink-4">{p?.role}</span>
+                  </li>
+                )
+              })}
+            </ol>
+            <p className="mt-3 text-[12px] text-ink-3">
+              <span className="cond mr-2">Bench</span>
+              {t.bench.map((pid) => byId.get(pid)?.name).filter(Boolean).join(', ')}
+            </p>
+          </div>
+        )
+      })}
     </section>
   )
 }

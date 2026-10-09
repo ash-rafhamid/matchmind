@@ -1,47 +1,43 @@
 import { useSettings } from '../lib/settings'
 
-/** The masthead: wordmark, edition line, and the reader's audience + language as a sentence. */
-export default function Header({ onHome }: { onHome: () => void }) {
+/** The slim broadcast bar: wordmark, who you are reading as, and which model is on air. */
+export default function Header() {
   const { persona, lang, setPersona, setLang, options, health } = useSettings()
   const ai = health?.ai
   return (
-    <header className="mx-auto w-full max-w-[1480px] px-4 sm:px-8">
-      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-b border-rule py-2 num text-[11px] tracking-wide text-ink-3 uppercase">
-        <span>Vol. I · Northbridge League · Every club, player and match is synthetic</span>
-        <span className="flex items-center gap-2" title={ai?.enabled ? `Agents run on ${ai.provider}` : 'No model configured - verified template narration'}>
-          <span className={ai?.enabled ? 'live-dot' : 'inline-block h-[7px] w-[7px] rounded-full bg-ink-4'} />
-          {ai ? (ai.enabled ? `Crew on duty · ${ai.provider} · ${ai.model}` : 'Template edition · no model') : 'Checking the crew'}
+    <header className="sticky top-0 z-40 flex h-[52px] items-center gap-4 bg-ink px-4 text-white sm:px-6">
+      <a href="#/" className="flex items-center gap-2.5" aria-label="MatchMind home">
+        <span className="flex h-6 items-stretch gap-[3px]" aria-hidden>
+          <span className="w-2.5 -skew-x-[18deg] bg-volt" />
+          <span className="w-2.5 -skew-x-[18deg] bg-white" />
         </span>
-      </div>
-
-      <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4 pt-5 pb-4">
-        <button onClick={onHome} className="group text-left" aria-label="MatchMind home">
-          <div className="display text-[44px] leading-[0.9] font-semibold sm:text-[56px]">
-            Match<span className="italic-wonk font-normal text-signal">Mind</span>
-          </div>
-          <div className="mt-2 label">The match, explained by an AI crew · fact-checked by code</div>
-        </button>
-
-        <div className="text-[17px] text-ink-2 sm:text-[19px]">
-          Reading as{' '}
-          <select value={persona} onChange={(e) => setPersona(e.target.value)} className="inline-select" aria-label="Audience">
+        <span className="xp text-[19px]">MatchMind</span>
+      </a>
+      <span className="hidden cond text-white/45 lg:inline">The AI match crew · fact-checked by code</span>
+      <div className="ml-auto flex items-center gap-5 text-[13px]">
+        <span className="hidden items-center gap-2 cond text-white/60 md:flex" title={ai?.enabled ? `Agents run on ${ai.provider}` : 'No model configured: verified template narration'}>
+          <span className={ai?.enabled ? 'live-pip !bg-volt' : 'inline-block h-2 w-2 bg-white/30'} />
+          {ai ? (ai.enabled ? `${ai.model} on ${ai.provider.replace(' (Foundry)', '')}` : 'template mode') : '...'}
+        </span>
+        <span className="text-white/70">
+          For{' '}
+          <select value={persona} onChange={(e) => setPersona(e.target.value)} className="pick text-white" aria-label="Audience">
             {Object.entries(options?.personas ?? { fan: 'Casual fan' }).map(([k, v]) => (
               <option key={k} value={k}>
-                {v.toLowerCase()}
+                {v}
               </option>
             ))}
           </select>{' '}
           in{' '}
-          <select value={lang} onChange={(e) => setLang(e.target.value)} className="inline-select" aria-label="Language">
+          <select value={lang} onChange={(e) => setLang(e.target.value)} className="pick text-white" aria-label="Language">
             {Object.entries(options?.languages ?? { en: 'English' }).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}
               </option>
             ))}
           </select>
-        </div>
+        </span>
       </div>
-      <div className="double-rule" />
     </header>
   )
 }
