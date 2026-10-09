@@ -201,6 +201,11 @@ def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int =
         ball = np.concatenate([ball[:1], np.diff(ball, axis=0)])
         ball_z = np.concatenate([ball_z[:1], np.diff(ball_z)])
     out.update(xy=xy.reshape(-1).tolist(), ball=ball.reshape(-1).tolist(), ball_z=ball_z.tolist())
+    # animation cues (kicks, tackles, slides, falls, dives) that start inside this window
+    c = tr["cues"]
+    t0, t1 = f0 / native, f1 / native
+    inside = c[(c[:, 0] >= t0) & (c[:, 0] < t1)] if len(c) else c
+    out["cues"] = [[round(float(t), 2), int(j), int(k)] for t, j, k in inside]
     return out
 
 

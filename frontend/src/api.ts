@@ -28,6 +28,8 @@ export interface TrackingChunk {
   ball_z?: number[]
   on_ball?: number[]
   enc?: 'delta'
+  /** animation cues starting in this window: [time, player column, kind] */
+  cues?: [number, number, number][]
   scale: number
 }
 

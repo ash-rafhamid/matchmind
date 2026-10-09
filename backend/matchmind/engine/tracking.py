@@ -31,6 +31,8 @@ class Tracking:
     ball_z: np.ndarray  # (frames,) float32, metres above the ground
     on_ball: np.ndarray  # (frames,) int32 column of the player controlling the ball, -1 if none
     vmax: np.ndarray  # (players,) top running speed in m/s
+    # animation cues: (time, player column, kind) - see CUE in choreo.py
+    cues: np.ndarray | None = None  # (k, 3) float32
 
     @property
     def frames(self) -> int:
