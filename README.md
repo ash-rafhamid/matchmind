@@ -142,13 +142,18 @@ Tools: `match_overview`, `get_moment`, `get_team_stats`, `get_player_stats`, `to
 
 ## Deploy to Azure
 
+Live demo: **https://matchmind.yellowground-bbb25fc7.japaneast.azurecontainerapps.io/**
+(MCP endpoint: `/mcp/`)
+
 ```bash
 az login
-LOCATION=japaneast bash infra/deploy.sh
+LOCATION=japaneast bash infra/deploy.sh      # Docker must be running
 ```
 
-Creates the resource group, a Microsoft Foundry (AI Services) resource with a `gpt-4.1-mini` deployment, and the
-Container App (cloud build), then grants the app's managed identity access to the model.
+Creates the resource group, a Microsoft Foundry (AI Services) resource with a `gpt-4.1-mini` deployment, an Azure
+Container Registry, and the Container App, then grants the app's system-assigned managed identity the
+*Cognitive Services OpenAI User* role - the running app holds no model keys. The image is built locally and pushed,
+because ACR cloud builds are not available on Azure for Students subscriptions.
 
 ## Cost controls
 
