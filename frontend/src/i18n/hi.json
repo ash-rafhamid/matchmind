@@ -252,5 +252,7 @@
  "voice.on": "टिप्पणी चालू",
  "voice.off": "टिप्पणी बंद",
  "home.crewLive": "AI कमेंट्री",
- "home.factChecked": "कोड से सत्यापित"
+ "home.factChecked": "कोड से सत्यापित",
+ "cam.live": "लाइव",
+ "cam.closeup": "क्लोज़-अप"
 }

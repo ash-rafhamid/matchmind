@@ -1,0 +1,1010 @@
+{
+ "es": {
+  "kickoff_first": [
+   "¡Y comenzamos!",
+   "¡Arranca el partido!"
+  ],
+  "kickoff_second": [
+   "Arranca la segunda mitad."
+  ],
+  "kickoff_restart": [
+   "{team} vuelve a poner el balón en juego."
+  ],
+  "pass_box": [
+   "¡{player} encuentra a {receiver} en el área!",
+   "¡Al área, {receiver}!"
+  ],
+  "cross": [
+   "¡{player} lanza un centro!",
+   "¡Centro de {player}!"
+  ],
+  "through": [
+   "¡{player} le pone un pase entre líneas a {receiver}!",
+   "¡Gran pase de {player}!"
+  ],
+  "long": [
+   "Balón largo de {player}.",
+   "{player} juega en largo."
+  ],
+  "final_third": [
+   "{player} se la pasa a {receiver}.",
+   "{receiver} recibe en el último tercio."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} para {receiver}.",
+   "{receiver}.",
+   "Ahora para {receiver}."
+  ],
+  "carry": [
+   "¡{player} avanza con el balón!",
+   "¡{player} en carrera!",
+   "{player} sigue con el balón."
+  ],
+  "corner": [
+   "{player} va a lanzar el córner.",
+   "Córner para {team}."
+  ],
+  "free_kick": [
+   "{player} se prepara para el tiro libre.",
+   "Tiro libre para {team}."
+  ],
+  "shot": [
+   "¡{player} dispara!",
+   "¡{player} lo intenta!",
+   "¡{player}, puede marcar!"
+  ],
+  "goal": [
+   "¡GOOOL! ¡{player}! {home} {home_score}, {away} {away_score}!",
+   "¡Gooool! ¡{player} anota! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "¡Salvó {keeper}!",
+   "¡Buena parada de {keeper}!",
+   "¡{keeper} evita el gol!"
+  ],
+  "off_target": [
+   "¡Por poco!",
+   "¡Fuera!",
+   "¡Por encima del travesaño!"
+  ],
+  "blocked": [
+   "¡Bloqueado!",
+   "¡Disparo tapado!"
+  ],
+  "tackle": [
+   "¡Gran entrada de {player}!",
+   "¡{player} recupera el balón!"
+  ],
+  "interception": [
+   "{player} corta el pase.",
+   "Intercepción de {player}."
+  ],
+  "clearance": [
+   "{player} despeja.",
+   "Despeje de {player}."
+  ],
+  "foul": [
+   "Falta de {player} sobre {victim}.",
+   "{victim} es derribado por {player}."
+  ],
+  "yellow": [
+   "Tarjeta amarilla para {player}."
+  ],
+  "red": [
+   "¡Tarjeta roja! ¡{player} es expulsado!"
+  ],
+  "offside": [
+   "Fuera de juego, {player}.",
+   "La bandera está arriba por fuera de juego."
+  ],
+  "substitution": [
+   "Cambio en {team}: entra {on} por {off}."
+  ],
+  "tactics": [
+   "{team} cambia su estrategia."
+  ],
+  "half_time": [
+   "Esto es el descanso. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "¡Final del partido! Termina {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "fr": {
+  "kickoff_first": [
+   "C'est parti !",
+   "Coup d'envoi, on y va !"
+  ],
+  "kickoff_second": [
+   "La seconde période commence."
+  ],
+  "kickoff_restart": [
+   "{team} relance le jeu."
+  ],
+  "pass_box": [
+   "{player} trouve {receiver} dans la surface !",
+   "Dans la surface, {receiver} !"
+  ],
+  "cross": [
+   "{player} envoie un centre !",
+   "Centre de {player} !"
+  ],
+  "through": [
+   "{player} lance {receiver} en profondeur !",
+   "Super passe de {player} !"
+  ],
+  "long": [
+   "Long ballon vers l'avant de {player}.",
+   "{player} joue long."
+  ],
+  "final_third": [
+   "{player} sert {receiver}.",
+   "{receiver} récupère dans le dernier tiers."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} à {receiver}.",
+   "{receiver}.",
+   "Maintenant {receiver}."
+  ],
+  "carry": [
+   "{player} fonce vers l'avant !",
+   "{player} est lancé !",
+   "{player} avance avec le ballon."
+  ],
+  "corner": [
+   "{player} va tirer le corner.",
+   "Corner pour {team}."
+  ],
+  "free_kick": [
+   "{player} se prépare pour le coup franc.",
+   "Coup franc pour {team}."
+  ],
+  "shot": [
+   "{player} frappe !",
+   "{player} tente sa chance !",
+   "{player}, va-t-il marquer ?"
+  ],
+  "goal": [
+   "BUT ! {player} ! {home} {home_score}, {away} {away_score} !",
+   "C'est au fond ! {player} marque ! {home} {home_score}, {away} {away_score} !"
+  ],
+  "saved": [
+   "Arrêt de {keeper} !",
+   "Belle parade de {keeper} !",
+   "{keeper} repousse le ballon !"
+  ],
+  "off_target": [
+   "Juste à côté !",
+   "Hors cadre.",
+   "Au-dessus !"
+  ],
+  "blocked": [
+   "Bloqué !",
+   "Dégagé !"
+  ],
+  "tackle": [
+   "Super tacle de {player} !",
+   "{player} récupère le ballon !"
+  ],
+  "interception": [
+   "{player} intercepte.",
+   "Interception de {player}."
+  ],
+  "clearance": [
+   "{player} dégage.",
+   "Dégagement de {player}."
+  ],
+  "foul": [
+   "Faut de {player} sur {victim}.",
+   "{victim} est plaqué par {player}."
+  ],
+  "yellow": [
+   "Carton jaune pour {player}."
+  ],
+  "red": [
+   "Carton rouge ! {player} est expulsé !"
+  ],
+  "offside": [
+   "Hors-jeu, {player}.",
+   "Le drapeau est levé pour hors-jeu."
+  ],
+  "substitution": [
+   "Changement pour {team} : {on} remplace {off}."
+  ],
+  "tactics": [
+   "{team} change sa stratégie."
+  ],
+  "half_time": [
+   "C'est la mi-temps. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "C'est fini ! Score final {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "pt": {
+  "kickoff_first": [
+   "Começa o jogo!",
+   "Bola rolando, vamos lá!"
+  ],
+  "kickoff_second": [
+   "Começa o segundo tempo."
+  ],
+  "kickoff_restart": [
+   "{team} reinicia o jogo."
+  ],
+  "pass_box": [
+   "{player} encontra {receiver} na área!",
+   "Na área, {receiver}!"
+  ],
+  "cross": [
+   "{player} cruza!",
+   "Cruzamento de {player}!"
+  ],
+  "through": [
+   "{player} passa para {receiver}!",
+   "Bela bola de {player}!"
+  ],
+  "long": [
+   "Bola longa de {player}.",
+   "{player} manda a bola lá na frente."
+  ],
+  "final_third": [
+   "{player} toca para {receiver}.",
+   "{receiver} recebe na entrada da área."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} para {receiver}.",
+   "{receiver}.",
+   "Agora com {receiver}."
+  ],
+  "carry": [
+   "{player} avança com a bola!",
+   "{player} em velocidade!",
+   "{player} conduz a bola."
+  ],
+  "corner": [
+   "{player} vai cobrar o escanteio.",
+   "Escanteio para {team}."
+  ],
+  "free_kick": [
+   "{player} se prepara para a falta.",
+   "Falta para {team}."
+  ],
+  "shot": [
+   "{player} chuta!",
+   "{player} arrisca!",
+   "{player}, vai tentar o gol?"
+  ],
+  "goal": [
+   "GOL! {player}! {home} {home_score}, {away} {away_score}!",
+   "É gol! {player} marca! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "Defesa de {keeper}!",
+   "Boa defesa de {keeper}!",
+   "{keeper} salva!"
+  ],
+  "off_target": [
+   "Por pouco!",
+   "Fora do alvo.",
+   "Por cima!"
+  ],
+  "blocked": [
+   "Bloqueado!",
+   "Chute travado!"
+  ],
+  "tackle": [
+   "Bela entrada de {player}!",
+   "{player} recupera a bola!"
+  ],
+  "interception": [
+   "{player} intercepta.",
+   "Intercepção de {player}."
+  ],
+  "clearance": [
+   "{player} afasta o perigo.",
+   "Despejado por {player}."
+  ],
+  "foul": [
+   "Falta de {player} em {victim}.",
+   "{victim} é derrubado por {player}."
+  ],
+  "yellow": [
+   "Cartão amarelo para {player}."
+  ],
+  "red": [
+   "Cartão vermelho! {player} expulso!"
+  ],
+  "offside": [
+   "Impedimento, {player}.",
+   "Bandeira levantada por impedimento."
+  ],
+  "substitution": [
+   "Substituição no {team}: {on} entra no lugar de {off}."
+  ],
+  "tactics": [
+   "{team} muda a estratégia."
+  ],
+  "half_time": [
+   "Fim do primeiro tempo. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "Fim de jogo! Placar final: {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "de": {
+  "kickoff_first": [
+   "Und los geht's!",
+   "Anstoß, und los geht's!"
+  ],
+  "kickoff_second": [
+   "Die zweite Halbzeit läuft."
+  ],
+  "kickoff_restart": [
+   "{team} bringen uns wieder ins Spiel."
+  ],
+  "pass_box": [
+   "{player} findet {receiver} im Strafraum!",
+   "Ab in den Strafraum, {receiver}!"
+  ],
+  "cross": [
+   "{player} schlägt eine Flanke rein!",
+   "Flanke von {player}!"
+  ],
+  "through": [
+   "{player} steckt durch zu {receiver}!",
+   "Feiner Pass von {player}!"
+  ],
+  "long": [
+   "Langer Ball nach vorne von {player}.",
+   "{player} spielt lang."
+  ],
+  "final_third": [
+   "{player} spielt zu {receiver}.",
+   "{receiver} nimmt den Ball im letzten Drittel an."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} zu {receiver}.",
+   "{receiver}.",
+   "Jetzt {receiver}."
+  ],
+  "carry": [
+   "{player} zieht nach vorne!",
+   "{player} auf dem Weg nach vorne!",
+   "{player} nimmt den Ball mit."
+  ],
+  "corner": [
+   "{player} to take the corner.",
+   "Ecke, {team}."
+  ],
+  "free_kick": [
+   "{player} stands over the free kick.",
+   "Freistoß, {team}."
+  ],
+  "shot": [
+   "{player} schießt!",
+   "{player} versucht's!",
+   "{player}, kann er treffen?"
+  ],
+  "goal": [
+   "TOR! {player}! {home} {home_score}, {away} {away_score}!",
+   "Drin! {player} trifft! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "Gehalten von {keeper}!",
+   "Gute Parade von {keeper}!",
+   "{keeper} hält den Schuss!"
+  ],
+  "off_target": [
+   "Knapp vorbei!",
+   "Daneben.",
+   "Über das Tor!"
+  ],
+  "blocked": [
+   "Abgeblockt!",
+   "Abgefangen!"
+  ],
+  "tackle": [
+   "Starker Tackling von {player}!",
+   "{player} erobert den Ball zurück!"
+  ],
+  "interception": [
+   "{player} schneidet den Pass ab.",
+   "Abgefangen von {player}."
+  ],
+  "clearance": [
+   "{player} klärt.",
+   "Geklärt von {player}."
+  ],
+  "foul": [
+   "Foul von {player} an {victim}.",
+   "{victim} wird von {player} zu Fall gebracht."
+  ],
+  "yellow": [
+   "Gelbe Karte für {player}."
+  ],
+  "red": [
+   "Rote Karte! {player} muss vom Platz!"
+  ],
+  "offside": [
+   "Abseits, {player}.",
+   "Die Fahne geht hoch wegen Abseits."
+  ],
+  "substitution": [
+   "Wechsel bei {team}: {on} kommt für {off} ins Spiel."
+  ],
+  "tactics": [
+   "{team} ändern ihre Taktik."
+  ],
+  "half_time": [
+   "Pause. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "Abpfiff! Es endet {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "ar": {
+  "kickoff_first": [
+   "وانطلق اللقاء!",
+   "انطلاقة المباراة، هيا بنا!"
+  ],
+  "kickoff_second": [
+   "انطلقت أحداث الشوط الثاني."
+  ],
+  "kickoff_restart": [
+   "{team} يعيد اللعب."
+  ],
+  "pass_box": [
+   "{player} يمرر إلى {receiver} داخل المنطقة!",
+   "داخل الصندوق، {receiver}!"
+  ],
+  "cross": [
+   "{player} يرسل عرضية!",
+   "عرضية من {player}!"
+  ],
+  "through": [
+   "{player} يمرر بينية رائعة إلى {receiver}!",
+   "تمريرة جميلة من {player}!"
+  ],
+  "long": [
+   "كرة طويلة من {player} إلى الأمام.",
+   "{player} يرسل كرة طويلة."
+  ],
+  "final_third": [
+   "{player} يمرر إلى {receiver}.",
+   "{receiver} يستلم الكرة في الثلث الأخير."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} إلى {receiver}.",
+   "{receiver}.",
+   "الآن الكرة مع {receiver}."
+  ],
+  "carry": [
+   "{player} يتقدم بالكرة!",
+   "{player} يركض بالكرة!",
+   "{player} يستمر في التقدم."
+  ],
+  "corner": [
+   "{player} سيتولى الركنية.",
+   "ركنية لـ {team}."
+  ],
+  "free_kick": [
+   "{player} يستعد لتنفيذ الركلة الحرة.",
+   "ركلة حرة لـ {team}."
+  ],
+  "shot": [
+   "{player} يسدد!",
+   "{player} يحاول!",
+   "{player}، هل يسجل؟"
+  ],
+  "goal": [
+   "هدف! {player}! {home} {home_score}، {away} {away_score}!",
+   "الكرة في الشباك! {player} يسجل! {home} {home_score}، {away} {away_score}!"
+  ],
+  "saved": [
+   "تصدي رائع من {keeper}!",
+   "تألق {keeper} في التصدي!",
+   "{keeper} يمنع الهدف!"
+  ],
+  "off_target": [
+   "قريبة جداً!",
+   "الكرة خارج المرمى.",
+   "فوق العارضة!"
+  ],
+  "blocked": [
+   "تصدى الدفاع!",
+   "تم إعاقة التسديدة!"
+  ],
+  "tackle": [
+   "تدخل ممتاز من {player}!",
+   "{player} يستعيد الكرة!"
+  ],
+  "interception": [
+   "{player} يقطع الكرة.",
+   "تم اعتراض الكرة من قبل {player}."
+  ],
+  "clearance": [
+   "{player} يبعد الكرة.",
+   "تم إبعاد الكرة بواسطة {player}."
+  ],
+  "foul": [
+   "خطأ من {player} على {victim}.",
+   "{victim} يسقط بعد تدخل من {player}."
+  ],
+  "yellow": [
+   "بطاقة صفراء لـ {player}."
+  ],
+  "red": [
+   "بطاقة حمراء! {player} يطرد من المباراة!"
+  ],
+  "offside": [
+   "تسلل على {player}.",
+   "الراية مرفوعة للتسلل."
+  ],
+  "substitution": [
+   "تبديل في صفوف {team}: {on} يدخل بدلاً من {off}."
+  ],
+  "tactics": [
+   "{team} يغيرون من أسلوب لعبهم."
+  ],
+  "half_time": [
+   "نهاية الشوط الأول. {home} {home_score}، {away} {away_score}."
+  ],
+  "full_time": [
+   "نهاية المباراة! النتيجة {home} {home_score}، {away} {away_score}."
+  ]
+ },
+ "hi": {
+  "kickoff_first": [
+   "और खेल शुरू हो गया है!",
+   "किक-ऑफ, और हम शुरू करते हैं!"
+  ],
+  "kickoff_second": [
+   "दूसरा हाफ शुरू हो चुका है."
+  ],
+  "kickoff_restart": [
+   "{team} फिर से खेल शुरू करता है."
+  ],
+  "pass_box": [
+   "{player} ने बॉक्स में {receiver} को खोजा!",
+   "बॉक्स में, {receiver}!"
+  ],
+  "cross": [
+   "{player} ने क्रॉस किया!",
+   "{player} की तरफ से क्रॉस!"
+  ],
+  "through": [
+   "{player} ने {receiver} को पास किया!",
+   "{player} का शानदार पास!"
+  ],
+  "long": [
+   "{player} ने लंबा पास आगे भेजा.",
+   "{player} ने लंबा पास मारा."
+  ],
+  "final_third": [
+   "{player} ने {receiver} को अंतिम तिहाई में पास दिया.",
+   "{receiver} ने अंतिम तिहाई में गेंद संभाली."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} से {receiver}.",
+   "{receiver}.",
+   "अब {receiver}."
+  ],
+  "carry": [
+   "{player} तेजी से आगे बढ़ रहा है!",
+   "{player} दौड़ में है!",
+   "{player} गेंद लेकर आगे बढ़ रहा है."
+  ],
+  "corner": [
+   "कोर्नर लेने वाले हैं {player}.",
+   "कोर्नर, {team}."
+  ],
+  "free_kick": [
+   "फ्री किक पर खड़े हैं {player}.",
+   "फ्री किक, {team}."
+  ],
+  "shot": [
+   "{player} ने शॉट लगाया!",
+   "{player} ने कोशिश की!",
+   "{player}, क्या वह गोल कर पाएगा?"
+  ],
+  "goal": [
+   "गोल! {player}! {home} {home_score}, {away} {away_score}!",
+   "गोल हो गया! {player} ने स्कोर किया! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "{keeper} ने बचाव किया!",
+   "{keeper} का शानदार बचाव!",
+   "{keeper} ने गोल होने से रोका!"
+  ],
+  "off_target": [
+   "थोड़ा बाहर!",
+   "टारगेट से बाहर.",
+   "बार के ऊपर गया!"
+  ],
+  "blocked": [
+   "रोक दिया गया!",
+   "शॉट ब्लॉक हो गया!"
+  ],
+  "tackle": [
+   "शानदार टैकल {player} से!",
+   "{player} ने गेंद वापस जीती!"
+  ],
+  "interception": [
+   "{player} ने इंटरसेप्ट किया.",
+   "{player} ने गेंद काट ली."
+  ],
+  "clearance": [
+   "{player} ने क्लियर किया.",
+   "{player} ने गेंद साफ की."
+  ],
+  "foul": [
+   "{player} ने {victim} पर फाउल किया.",
+   "{victim} को {player} ने गिराया."
+  ],
+  "yellow": [
+   "{player} को येलो कार्ड."
+  ],
+  "red": [
+   "रेड कार्ड! {player} को मैदान से बाहर किया गया!"
+  ],
+  "offside": [
+   "ऑफसाइड, {player}.",
+   "फ्लैग उठ गया है ऑफसाइड के लिए."
+  ],
+  "substitution": [
+   "{team} में बदलाव: {off} की जगह {on} मैदान में आता है."
+  ],
+  "tactics": [
+   "{team} अपनी रणनीति बदल रहा है."
+  ],
+  "half_time": [
+   "पहला हाफ खत्म. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "फुल टाइम! मैच खत्म हुआ {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "bn": {
+  "kickoff_first": [
+   "আর শুরু হলো খেলা!",
+   "কিক-অফ, শুরু হলো!"
+  ],
+  "kickoff_second": [
+   "দ্বিতীয়ার্ধ শুরু হয়েছে।"
+  ],
+  "kickoff_restart": [
+   "{team} আবার শুরু করল।"
+  ],
+  "pass_box": [
+   "{player} {receiver}-কে বক্সে খুঁজে পেল!",
+   "বক্সের ভিতরে, {receiver}!"
+  ],
+  "cross": [
+   "{player} ক্রস করল!",
+   "{player} থেকে ক্রস!"
+  ],
+  "through": [
+   "{player} {receiver}-কে পাস দিল!",
+   "{player} থেকে দারুণ পাস!"
+  ],
+  "long": [
+   "{player} লম্বা বল দিল সামনে।",
+   "{player} লম্বা বল খেলল।"
+  ],
+  "final_third": [
+   "{player} {receiver}-কে পাস করল।",
+   "শেষ তৃতীয়াংশে {receiver} বল পেয়েছে।"
+  ],
+  "pass": [
+   "{player}.",
+   "{player} থেকে {receiver}.",
+   "{receiver}.",
+   "এখন {receiver}।"
+  ],
+  "carry": [
+   "{player} এগিয়ে যাচ্ছে!",
+   "{player} দৌড়ে চলছে!",
+   "{player} বল নিয়ে এগোচ্ছে।"
+  ],
+  "corner": [
+   "কোণার জন্য {player}।",
+   "কোণা, {team}।"
+  ],
+  "free_kick": [
+   "ফ্রি কিকের সামনে {player}।",
+   "ফ্রি কিক, {team}।"
+  ],
+  "shot": [
+   "{player} শট নিল!",
+   "{player} চেষ্টা করল!",
+   "{player}, গোল করতে পারবে?"
+  ],
+  "goal": [
+   "গোল! {player}! {home} {home_score}, {away} {away_score}!",
+   "গোল হয়েছে! {player} গোল করল! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "{keeper} সেভ করল!",
+   "{keeper} দারুণ সেভ!",
+   "{keeper} বল আটকে দিল!"
+  ],
+  "off_target": [
+   "সামান্য বাইরে!",
+   "টার্গেটের বাইরে।",
+   "বারের ওপর!"
+  ],
+  "blocked": [
+   "ব্লক!",
+   "চালানো হলো!"
+  ],
+  "tackle": [
+   "দারুণ ট্যাকল {player}!",
+   "{player} বল জিতল!"
+  ],
+  "interception": [
+   "{player} বল কেটে নিল।",
+   "{player} ইন্টারসেপ্ট করল।"
+  ],
+  "clearance": [
+   "{player} বল ক্লিয়ার করল।",
+   "{player} ক্লিয়ারেন্স দিল।"
+  ],
+  "foul": [
+   "{player} ফাউল করল {victim}-এর উপর।",
+   "{victim} কে {player} ফাউল করল।"
+  ],
+  "yellow": [
+   "{player}-কে হলুদ কার্ড।"
+  ],
+  "red": [
+   "লাল কার্ড! {player} মাঠ থেকে বের হয়ে গেল!"
+  ],
+  "offside": [
+   "অফসাইড, {player}।",
+   "অফসাইডের জন্য পতাকা উঠল।"
+  ],
+  "substitution": [
+   "{team} পরিবর্তন: {off} এর বদলে {on} খেলছে।"
+  ],
+  "tactics": [
+   "{team} তাদের কৌশল পরিবর্তন করছে।"
+  ],
+  "half_time": [
+   "মাঝের বিরতি। {home} {home_score}, {away} {away_score}।"
+  ],
+  "full_time": [
+   "পূর্ণ সময়! ফলাফল {home} {home_score}, {away} {away_score}।"
+  ]
+ },
+ "sw": {
+  "kickoff_first": [
+   "Na tunaanza!",
+   "Mchezo unaanza!"
+  ],
+  "kickoff_second": [
+   "Nusu ya pili inaanza."
+  ],
+  "kickoff_restart": [
+   "{team} wanaanza tena."
+  ],
+  "pass_box": [
+   "{player} finds {receiver} in the box!",
+   "Kuingia kisanduku, {receiver}!"
+  ],
+  "cross": [
+   "{player} anatuma mpira wa msalaba!",
+   "Msalaba kutoka kwa {player}!"
+  ],
+  "through": [
+   "{player} amemtumia pasi ya kupitisha {receiver}!",
+   "Pasi nzuri kutoka kwa {player}!"
+  ],
+  "long": [
+   "Mpira mrefu mbele kutoka kwa {player}.",
+   "{player} anatuma mpira mrefu."
+  ],
+  "final_third": [
+   "{player} anampigia pasi {receiver}.",
+   "{receiver} anapokea mpira katika sehemu ya mwisho."
+  ],
+  "pass": [
+   "{player}.",
+   "{player} kwa {receiver}.",
+   "{receiver}.",
+   "Sasa {receiver}."
+  ],
+  "carry": [
+   "{player} anaendesha mbele!",
+   "{player} anakimbia na mpira!",
+   "{player} anaendelea na mpira."
+  ],
+  "corner": [
+   "{player} atachukua kona.",
+   "Kona, {team}."
+  ],
+  "free_kick": [
+   "{player} anasimama juu ya mpira wa adhabu.",
+   "Mpira wa adhabu, {team}."
+  ],
+  "shot": [
+   "{player} anapiga!",
+   "{player} anajaribu!",
+   "{player}, anaweza kufunga?"
+  ],
+  "goal": [
+   "GOOL! {player}! {home} {home_score}, {away} {away_score}!",
+   "Imeingia! {player} amefunga! {home} {home_score}, {away} {away_score}!"
+  ],
+  "saved": [
+   "{keeper} amekamata!",
+   "Kukamata nzuri kutoka kwa {keeper}!",
+   "{keeper} amekuzuia!"
+  ],
+  "off_target": [
+   "Kipindi kidogo!",
+   "Mpira umepitwa.",
+   "Mpira juu ya mwamba!"
+  ],
+  "blocked": [
+   "Imezuia!",
+   "Mpira umezingirwa!"
+  ],
+  "tackle": [
+   "Mshambuliaji amesimamishwa na {player}!",
+   "{player} amepata mpira tena!"
+  ],
+  "interception": [
+   "{player} amekata pasi.",
+   "Imechukuliwa na {player}."
+  ],
+  "clearance": [
+   "{player} ameondoa hatari.",
+   "Imeondolewa na {player}."
+  ],
+  "foul": [
+   "Makosa ya {player} dhidi ya {victim}.",
+   "{victim} amedungwa chini na {player}."
+  ],
+  "yellow": [
+   "Kadi ya njano kwa {player}."
+  ],
+  "red": [
+   "Kadi nyekundu! {player} ameondolewa uwanjani!"
+  ],
+  "offside": [
+   "Offside, {player}.",
+   "Bendera imeinuliwa kwa offside."
+  ],
+  "substitution": [
+   "Mabadiliko kwa {team}: {on} anaingia badala ya {off}."
+  ],
+  "tactics": [
+   "{team} wanabadilisha mbinu zao."
+  ],
+  "half_time": [
+   "Ni mapumziko ya nusu. {home} {home_score}, {away} {away_score}."
+  ],
+  "full_time": [
+   "Mchezo umemalizika! Matokeo ni {home} {home_score}, {away} {away_score}."
+  ]
+ },
+ "ja": {
+  "kickoff_first": [
+   "さあ、キックオフです！",
+   "キックオフ、試合開始！"
+  ],
+  "kickoff_second": [
+   "後半が始まりました。"
+  ],
+  "kickoff_restart": [
+   "{team}が再開します。"
+  ],
+  "pass_box": [
+   "{player}がボックス内の{receiver}にパス！",
+   "ボックス内へ、{receiver}！"
+  ],
+  "cross": [
+   "{player}がクロスを上げる！",
+   "{player}からのクロス！"
+  ],
+  "through": [
+   "{player}が{receiver}へスルーパス！",
+   "{player}の素晴らしいボール！"
+  ],
+  "long": [
+   "{player}がロングボールを送る。",
+   "{player}がロングパス。"
+  ],
+  "final_third": [
+   "{player}が{receiver}にパス。",
+   "最終ライン付近で{receiver}がボールを受ける。"
+  ],
+  "pass": [
+   "{player}。",
+   "{player}から{receiver}へ。",
+   "{receiver}。",
+   "今、{receiver}。"
+  ],
+  "carry": [
+   "{player}がドリブルで前進！",
+   "{player}が走り込む！",
+   "{player}がボールを運ぶ。"
+  ],
+  "corner": [
+   "{player}がコーナーキックを蹴る。",
+   "コーナーキック、{team}。"
+  ],
+  "free_kick": [
+   "{player}がフリーキックの構え。",
+   "フリーキック、{team}。"
+  ],
+  "shot": [
+   "{player}がシュート！",
+   "{player}が狙う！",
+   "{player}、決められるか？"
+  ],
+  "goal": [
+   "ゴール！{player}！{home} {home_score}、{away} {away_score}！",
+   "決まった！{player}のゴール！{home} {home_score}、{away} {away_score}！"
+  ],
+  "saved": [
+   "{keeper}がセーブ！",
+   "{keeper}の好セーブ！",
+   "{keeper}が止めた！"
+  ],
+  "off_target": [
+   "わずかに外れた！",
+   "枠を外した。",
+   "バーを越えた！"
+  ],
+  "blocked": [
+   "ブロックされた！",
+   "シュートはブロック！"
+  ],
+  "tackle": [
+   "{player}の素晴らしいタックル！",
+   "{player}がボールを奪い返す！"
+  ],
+  "interception": [
+   "{player}がカット！",
+   "{player}がインターセプト。"
+  ],
+  "clearance": [
+   "{player}がクリア。",
+   "{player}がクリアリング。"
+  ],
+  "foul": [
+   "{player}が{victim}にファウル。",
+   "{player}が{victim}を倒す。"
+  ],
+  "yellow": [
+   "{player}にイエローカード。"
+  ],
+  "red": [
+   "レッドカード！{player}が退場！"
+  ],
+  "offside": [
+   "オフサイド、{player}。",
+   "オフサイドの旗が上がる。"
+  ],
+  "substitution": [
+   "{team}交代：{off}に代わって{on}が入る。"
+  ],
+  "tactics": [
+   "{team}が戦術を変更。"
+  ],
+  "half_time": [
+   "前半終了。{home} {home_score}、{away} {away_score}。"
+  ],
+  "full_time": [
+   "試合終了！{home} {home_score}、{away} {away_score}で終了。"
+  ]
+ }
+}

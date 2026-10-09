@@ -252,5 +252,7 @@
  "voice.on": "Commentary on",
  "voice.off": "Commentary off",
  "home.crewLive": "AI commentary",
- "home.factChecked": "Fact-checked by code"
+ "home.factChecked": "Fact-checked by code",
+ "cam.live": "Live",
+ "cam.closeup": "Close-up"
 }

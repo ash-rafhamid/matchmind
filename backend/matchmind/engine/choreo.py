@@ -19,6 +19,8 @@ so analytics, AI commentary and the 3D replay all describe the same match.
 
 from __future__ import annotations
 
+from bisect import bisect_right
+
 import numpy as np
 
 from .formations import FORMATIONS, role_group
@@ -195,6 +197,20 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
     touch = {"who": -1, "dist": 0.0}  # distance run with the ball since the last change of owner (for touches)
     fouls = sorted((e for e in events if e["type"] == "foul" and e.get("victim")), key=lambda e: e["ts"])
     fi = 0
+    # a foul before the next touch stops play there: the ball has to reach the fouled man first
+    foul_after: dict[int, dict] = {}
+    fq = 0
+    for i, e in enumerate(ball_events):
+        nb_ts = ball_events[i + 1]["ts"] if i + 1 < len(ball_events) else float("inf")
+        while fq < len(fouls) and fouls[fq]["ts"] <= e["ts"]:
+            fq += 1
+        if fq < len(fouls) and fouls[fq]["ts"] < nb_ts:
+            foul_after[id(e)] = fouls[fq]
+    ball_ts = [e["ts"] for e in ball_events]
+    prep: dict | None = None  # the next restart while the ball is dead: {"ev", "spot", "taker", "ball_at"}
+    restart_spot: dict[int, np.ndarray] = {}
+    dead_kind = "start"
+    was_dead = True
     reset_frames = set(period_starts)
     was_on = ~np.isnan(targets[0, :, 0])
 
@@ -270,6 +286,27 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             speed *= 0.8  # setting himself for the pass
         return {"who": j, "dir": _unit(direction), "speed": float(speed), "until": t + dur, "calm": calm}
 
+    def prepare_restart(t: float, kind: str) -> None:
+        """The ball is dead: it goes back to where play restarts and the taker walks over before the whistle."""
+        nonlocal prep
+        prep = None
+        if kind in ("period_end", "start"):
+            return
+        i = bisect_right(ball_ts, t)
+        nb = ball_events[i] if i < len(ball_events) else None
+        if nb is None or not nb.get("set_piece"):
+            return
+        sp = nb["set_piece"]
+        if sp == "free_kick" and kind == "foul":
+            spot = ball.copy()  # where the foul was
+        elif sp == "kickoff":
+            spot = np.array([PITCH_LENGTH / 2, GOAL_Y])
+        else:
+            spot = np.array([nb["x"], nb["y"]], dtype=float)
+        restart_spot[id(nb)] = spot
+        prep = {"ev": nb, "spot": spot, "taker": col.get(nb.get("player") or ""),
+                "ball_at": t + (10.0 if kind == "goal" else 2.5)}
+
     def strike(e: dict, t: float, to: int | None, aim: np.ndarray, t1: float, peak: float, dead_after: bool) -> None:
         nonlocal flight, owner, dribble
         p0 = ball.copy()
@@ -304,14 +341,26 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 continue
             if typ == "foul" and j is not None and on[j]:
                 victim = col.get(e.get("victim") or "")
-                far = victim is None or np.hypot(*(pos[j] - pos[victim])) > 1.8
-                cues.append((t - 0.15, j, CUE["slide"] if far and cue_rng.random() < 0.5 else CUE["stab"]))
+                gap = 99.0 if victim is None else float(np.hypot(*(pos[j] - pos[victim])))
+                cues.append((t - 0.15, j, CUE["slide"] if 1.3 < gap < 4.5 and cue_rng.random() < 0.6 else CUE["stab"]))
                 if victim is not None and on[victim]:
                     cues.append((t, victim, CUE["fall"]))
+            if typ == "goal":
+                # the scorer runs off to celebrate by the corner flag; team-mates chase him down
+                scorer = col.get(e.get("player") or "")
+                if scorer is not None and on[scorer]:
+                    gx = goal_x[side_arr[scorer]]
+                    corner_y = 5.0 if pos[scorer][1] < GOAL_Y else PITCH_WIDTH - 5.0
+                    spot = np.array([gx - (9.0 if gx > 50 else -9.0), corner_y])
+                    roles[scorer] = {"to": spot, "chase": None, "until": t + 6.5, "speed": "sprint"}
+                    for c in team_cols(side_arr[scorer], on):
+                        if c != scorer and role_at[f, c] != "GK" and np.hypot(*(pos[c] - pos[scorer])) < 45:
+                            roles[c] = {"chase": scorer, "to": None, "until": t + 7.5, "speed": "sprint"}
             if typ in dead_types:
                 if typ != "goal":
                     fixes.append((e, "xy", f, "ball", None))
                 dead = True
+                dead_kind = typ
                 owner = -1 if typ != "offside" else owner
                 continue
             if typ == "pressure":
@@ -325,7 +374,9 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 continue
             # the ball is live again (restarts) or changes hands
             if dead and e.get("set_piece"):
-                spot = np.array([e["x"], e["y"]], dtype=float)
+                spot = restart_spot.pop(id(e), None)
+                if spot is None:
+                    spot = np.array([e["x"], e["y"]], dtype=float)
                 if np.hypot(*(pos[j] - spot)) > 2.5:
                     pos[j] = spot - _unit(np.array([goal_x[side_arr[j]] - spot[0], GOAL_Y - spot[1]])) * FEET
                 ball = spot.copy()
@@ -371,6 +422,9 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             # passes, clearances and shots: the player keeps the ball, then strikes it
             intent = np.array([e.get("end_x", e["x"]), e.get("end_y", e["y"])], dtype=float)
             arrive = nxt["ts"] if nxt is not None and nxt["ts"] > e["ts"] else e["ts"] + max(e.get("dur", 1.0), 0.5)
+            fl = foul_after.get(id(e)) if typ != "shot" else None
+            if fl is not None:
+                arrive = float(max(e["ts"] + 0.6, min(arrive, e["ts"] + max(e.get("dur", 1.0), 0.5), fl["ts"] - 0.7)))
             if typ == "shot":
                 strike_at = e["ts"] + 0.12
             else:
@@ -380,6 +434,13 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 dribble = None
             receiver = col.get(e.get("receiver") or "") if e.get("outcome") == "complete" else None
             catcher = col.get(nxt["player"]) if nxt is not None and nxt["team"] != e["team"] and nxt["type"] in ("interception", "save", "block") else None
+            if fl is not None:
+                v = col.get(fl["victim"])
+                if v is not None and on[v] and v != receiver:
+                    if side_arr[v] == side_arr[j]:
+                        receiver, catcher = v, None
+                    else:
+                        receiver, catcher = None, v
             if receiver is not None and on[receiver]:
                 roles[receiver] = {"to": intent, "chase": None, "until": arrive, "speed": "run"}
             if catcher is not None and on[catcher] and typ != "shot":
@@ -428,6 +489,11 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 flight_end = t + float(np.clip(np.hypot(*(aim - ball)) / 25.0, 0.25, max(left, 0.3)))
                 cues.append((t - 0.12, j, CUE["shoot"]))
                 strike(e, t, to, aim, flight_end, peak, dead_after)
+                if out == "goal":
+                    e["dur"] = round(flight_end - e["ts"], 2)
+                    goal_ev = next((x for x in script[k:] if x["type"] == "goal"), None)
+                    if goal_ev is not None:
+                        goal_ev["ts"] = round(flight_end, 2)
                 # the shot is where the shooter really was: keep xG consistent with that spot
                 ax = e["x"] if side_arr[j] else PITCH_LENGTH - e["x"]
                 ay = e["y"] if side_arr[j] else PITCH_WIDTH - e["y"]
@@ -474,8 +540,28 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 owner = flight["to"]
                 face[owner] = _unit(ball - pos[owner]) if np.hypot(*(ball - pos[owner])) > 0.2 else face[owner]
             if flight["dead_after"]:
+                if not dead:
+                    dead_kind = "out"
                 dead = True
             flight = None
+
+        # ------------------------------------------------ dead ball: get ready for the restart
+        if dead and not was_dead:
+            prepare_restart(t, dead_kind)
+        was_dead = dead
+        if prep is not None:
+            if not dead or t > prep["ev"]["ts"] + 0.5:
+                prep = None
+            else:
+                if flight is None and t >= prep["ball_at"] and np.hypot(*(prep["spot"] - ball)) > 0.5:
+                    # the ball is thrown or knocked back to the spot
+                    gap_b = float(np.hypot(*(prep["spot"] - ball)))
+                    flight = {"p0": ball.copy(), "p1": prep["spot"].copy(), "t0": t, "t1": t + float(np.clip(gap_b / 14.0, 0.6, 2.4)),
+                              "peak": float(min(5.0, 0.1 * gap_b + 0.5)), "to": None, "dead_after": True}
+                tk = prep["taker"]
+                if tk is not None and on[tk] and t >= prep["ball_at"] - 1.5:
+                    attack = _unit(np.array([goal_x[side_arr[tk]], GOAL_Y]) - prep["spot"])
+                    roles[tk] = {"to": prep["spot"] - attack * (FEET + 0.25), "chase": None, "until": prep["ev"]["ts"], "speed": "run"}
 
         # ------------------------------------------------ where everyone wants to go
         tgt = targets[f].copy()
@@ -548,15 +634,16 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
         while fi < len(fouls) and fouls[fi]["ts"] < t:
             fi += 1
         calm = False
-        if fi < len(fouls) and owner >= 0 and fouls[fi]["ts"] - t < 2.5 and col.get(fouls[fi]["victim"]) == owner:
-            # the man who will commit the foul closes him down
+        if fi < len(fouls) and fouls[fi]["ts"] - t < 3.5 and not dead:
+            fv = col.get(fouls[fi]["victim"])
             fj = col.get(fouls[fi].get("player") or "")
-            if fj is not None and on[fj] and fj not in roles:
-                roles[fj] = {"chase": owner, "to": None, "until": fouls[fi]["ts"], "speed": "sprint"}
-                tgt[fj] = pos[owner]
+            if fv is not None and fj is not None and on[fv] and on[fj]:
+                # the man who commits the foul closes his victim down
+                roles[fj] = {"chase": fv, "to": None, "until": fouls[fi]["ts"], "speed": "sprint"}
+                tgt[fj] = pos[fv] + vel[fv] * 0.3
                 speed_cap[fj] = vmax[fj]
                 urgent[fj] = True
-            calm = True
+                calm = fv == owner
         if owner >= 0 and on[owner]:
             if dribble is not None and np.hypot(*(dribble["to"] - pos[owner])) < 0.8:
                 dribble = None  # the scripted carry is done: he keeps going on his own

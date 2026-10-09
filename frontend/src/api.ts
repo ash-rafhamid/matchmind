@@ -1,4 +1,4 @@
-import type { AskResult, CrewResult, Health, MatchPackage, MatchSummary, Options, WhatIfResult } from './types'
+import type { AskResult, CommentaryLine, CrewResult, Health, MatchPackage, MatchSummary, Options, WhatIfResult } from './types'
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -41,6 +41,7 @@ export const api = {
   match: (id: string) => call<MatchPackage>(`/api/matches/${id}?rev=2`),
   tracking: (id: string, start: number, seconds: number, version = '') =>
     call<TrackingChunk>(`/api/matches/${id}/tracking?start=${start}&seconds=${seconds}&hz=10&enc=delta&v=${version}`),
+  commentary: (id: string, lang: string) => call<{ voice: boolean; lines: CommentaryLine[] }>(`/api/matches/${id}/commentary?lang=${lang}`),
   story: (id: string, momentId: string, persona: string, lang: string) =>
     call<CrewResult>(`/api/matches/${id}/moments/${momentId}/story?persona=${persona}&lang=${lang}`),
   recap: (id: string, persona: string, lang: string) =>

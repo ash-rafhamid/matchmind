@@ -3,7 +3,6 @@ import { api } from '../api'
 import { formatClock, useClock } from '../lib/clock'
 import { lastEventIndex, scoreAt, useMatch } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
-import { speak, speechAvailable, stopSpeaking } from '../lib/speech'
 import { momentTitle, onPrimary, surname } from '../lib/ui'
 import type { ReelState } from '../lib/reel'
 import type { Atmosphere } from '../lib/sound'
@@ -92,14 +91,18 @@ export function useCamCut(setCam: (m: CameraMode) => void) {
     },
     [setCam],
   )
-  return { cut, onCut, pick }
+  // an edit made by the page itself (into a replay, back to live)
+  const flash = useCallback((shot: string) => setCut((c) => ({ shot, n: (c?.n ?? 0) + 1, strong: true })), [])
+  return { cut, onCut, pick, flash }
 }
+
+const CUT_LABEL: Record<string, string> = { replay: 'reel.replay', live: 'cam.live', closeup: 'cam.closeup', celebrate: 'cam.celebrate' }
 
 /** A broadcast stinger when the camera changes: a quick dip with a sweep, and the camera's name. */
 export function CamCut({ cut }: { cut: CamCutState | null }) {
   const t = useT()
-  if (!cut || cut.shot === 'replay') return null
-  const label = t(`cam.${cut.shot}`)
+  if (!cut) return null
+  const label = t(CUT_LABEL[cut.shot] ?? `cam.${cut.shot}`)
   return (
     <div key={cut.n} className="pointer-events-none absolute inset-0 z-[6] overflow-hidden">
       {cut.strong && (
@@ -134,46 +137,24 @@ export function useCrossings(events: MatchEvent[] | Moment[], onCross: (e: Match
 }
 
 /** Broadcast lower third: the crew's verified take on the moment that just happened. */
-export function LowerThird({ moment, onDone, onOpen, voice = false }: { moment: Moment; onDone: () => void; onOpen: () => void; voice?: boolean }) {
-  const { pkg, clock } = useMatch()
+export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone: () => void; onOpen: () => void }) {
+  const { pkg } = useMatch()
   const { persona, lang, t } = useSettings()
   const [story, setStory] = useState<CrewResult | null>(null)
   const team = pkg.meta.teams[moment.team]
   const isGoal = moment.type === 'goal'
   const done = useRef(onDone)
   done.current = onDone
-  const speaking = voice && speechAvailable
 
   useEffect(() => {
     let alive = true
     api.story(pkg.meta.id, moment.id, persona, lang).then((s) => alive && setStory(s)).catch(() => undefined)
-    const t = window.setTimeout(() => done.current(), speaking ? 45000 : 14000)
+    const t = window.setTimeout(() => done.current(), 16000)
     return () => {
       alive = false
       clearTimeout(t)
     }
-  }, [pkg.meta.id, moment.id, persona, lang, speaking])
-
-  // commentary voice: read the crew's line out, pausing with the match
-  useEffect(() => {
-    if (!speaking || !story) return
-    let after = 0
-    speak(story.text, lang, () => {
-      after = window.setTimeout(() => done.current(), 1500)
-    })
-    let was = clock.playing
-    const off = clock.subscribe(() => {
-      if (clock.playing === was) return
-      was = clock.playing
-      if (was) window.speechSynthesis.resume()
-      else window.speechSynthesis.pause()
-    })
-    return () => {
-      off()
-      clearTimeout(after)
-      stopSpeaking()
-    }
-  }, [speaking, story, lang, clock])
+  }, [pkg.meta.id, moment.id, persona, lang])
 
   return (
     <div className="wipe-up pointer-events-auto max-w-[760px] shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
@@ -275,7 +256,7 @@ export function Transport({ mode, onMode, onPlay, reel, sound, onSound, voice = 
         <button className={`act ${sound ? '!text-ink' : ''}`} onClick={onSound} aria-pressed={sound}>
           {sound ? '🔊' : '🔈'} {sound ? t('sound.on') : t('sound.off')}
         </button>
-        {onVoice && speechAvailable && (
+        {onVoice && (
           <button className={`act ${voice ? '!text-ink' : ''}`} onClick={onVoice} aria-pressed={voice}>
             🎙 {voice ? t('voice.on') : t('voice.off')}
           </button>
@@ -304,16 +285,14 @@ export function Transport({ mode, onMode, onPlay, reel, sound, onSound, voice = 
   )
 }
 
-/** While a dead-ball stretch fast-forwards: a small badge, the match keeps moving underneath. */
-export function RestartCut({ to }: { to: MatchEvent }) {
+/** The REPLAY bug over a slow-motion replay. */
+export function ReplayBug() {
   const t = useT()
   return (
     <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center sm:top-4">
-      <div className="fade-in flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
-        <span className="cut-l flex items-center bg-ink ps-4 pe-3 cond text-volt">⏩ 10×</span>
-        <span className="cut-r flex items-center bg-white pe-5 ps-3 cond text-ink">
-          {t('reel.restart')} {to.clock}
-        </span>
+      <div className="wipe flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+        <span className="cut-l flex items-center bg-flare ps-5 pe-3 xp text-[18px] text-white">{t('reel.replay')}</span>
+        <span className="cut-r flex items-center bg-ink pe-5 ps-3 cond text-volt">{t('reel.slowmo')} · 0.5×</span>
       </div>
     </div>
   )
@@ -324,15 +303,7 @@ const CLIP_KEY: Record<string, string> = { kickoff: 'reel.kickoff', chance: 'ree
 /** What the edit shows between clips: a wipe with the next moment, or the REPLAY bug over a slow-motion replay. */
 export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull: () => void; onAgain: () => void }) {
   const t = useT()
-  if (reel.phase === 'replay')
-    return (
-      <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center sm:top-4">
-        <div className="wipe flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
-          <span className="cut-l flex items-center bg-flare ps-5 pe-3 xp text-[18px] text-white">{t('reel.replay')}</span>
-          <span className="cut-r flex items-center bg-ink pe-5 ps-3 cond text-volt">{t('reel.slowmo')} · 0.5×</span>
-        </div>
-      </div>
-    )
+  if (reel.phase === 'replay') return <ReplayBug />
   if (reel.phase === 'cut') {
     const isReplay = reel.cutTo === 'replay'
     const c = isReplay ? reel.clip : reel.next

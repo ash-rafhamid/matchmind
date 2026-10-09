@@ -22,7 +22,7 @@ from starlette.concurrency import run_in_threadpool
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from . import cache, store  # noqa: E402
+from . import cache, commentary, store, voice  # noqa: E402
 from .ai.crew import Crew, Job  # noqa: E402
 from .ai.llm import make_client  # noqa: E402
 from .ai.packets import moment_packet, recap_packet  # noqa: E402
@@ -252,6 +252,55 @@ async def moment_story(match_id: str, moment_id: str, request: Request, persona:
     _check_audience(persona, lang)
     pkg = _load(match_id)
     return await _moment_story(pkg, _moment_or_404(pkg, moment_id), persona, lang, _client_key(request))
+
+
+# ------------------------------------------------------------------ the commentator's voice
+
+TTS_LIMIT = RateLimiter(int(os.environ.get("VOICE_REQUESTS_PER_10_MIN", "900")), 600)
+_lines_cache: dict[tuple[str, str, str], list[dict]] = {}
+
+
+def _lines(match_id: str, lang: str) -> list[dict]:
+    key = (match_id, lang, _version(match_id))
+    if key not in _lines_cache:
+        _lines_cache[key] = commentary.build_lines(_load(match_id), lang)
+    return _lines_cache[key]
+
+
+async def _audio(text: str, lang: str, mood: str, request: Request) -> Response:
+    if not voice.available():
+        raise HTTPException(503, "no voice configured")
+    TTS_LIMIT.check(_client_key(request))
+    try:
+        data = await voice.speak(text, lang, mood)
+    except Exception as exc:  # network or auth trouble: the page falls back to the browser's voice
+        raise HTTPException(502, "the commentator's voice is unavailable") from exc
+    return Response(data, media_type="audio/mpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/api/matches/{match_id}/commentary")
+def commentary_lines(match_id: str, lang: str = "en") -> dict:
+    """Every play-by-play call the commentator could make, built from the events only."""
+    _check_audience("fan", lang)
+    return {"voice": voice.available(), "lines": _lines(match_id, lang)}
+
+
+@app.get("/api/matches/{match_id}/commentary/{line_id}.mp3")
+async def commentary_audio(match_id: str, line_id: str, request: Request, lang: str = "en") -> Response:
+    _check_audience("fan", lang)
+    line = next((x for x in _lines(match_id, lang) if x["id"] == line_id), None)
+    if line is None:
+        raise HTTPException(404, f"no line {line_id}")
+    return await _audio(line["text"], lang, "excited" if line["excited"] else "call", request)
+
+
+@app.get("/api/matches/{match_id}/moments/{moment_id}/voice.mp3")
+async def moment_voice(match_id: str, moment_id: str, request: Request, persona: str = "fan", lang: str = "en") -> Response:
+    """The crew's verified take on a moment, read out (the opening sentences)."""
+    _check_audience(persona, lang)
+    pkg = _load(match_id)
+    story = await _moment_story(pkg, _moment_or_404(pkg, moment_id), persona, lang, _client_key(request))
+    return await _audio(voice.first_sentences(story["text"]), lang, "story", request)
 
 
 @app.get("/api/matches/{match_id}/recap")
