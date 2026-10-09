@@ -4,7 +4,7 @@ import { useClock } from '../lib/clock'
 import { useMatch } from '../lib/match'
 import { useSettings } from '../lib/settings'
 import { speak, speechAvailable, stopSpeaking } from '../lib/speech'
-import { teamInk } from '../lib/ui'
+import { onPrimary } from '../lib/ui'
 import type { CrewResult, Moment } from '../types'
 import StoryText from './StoryText'
 import { TraceButton, VerifiedBadge } from './Trace'
@@ -18,34 +18,46 @@ const KICKER: Record<Moment['type'], string> = {
   momentum: 'Momentum',
 }
 
-/** The live blog: key moments appear as the replay reaches them, newest first. */
-export default function CrewFeed() {
+/** The crew's running commentary: key moments appear as the replay reaches them, newest first. */
+export default function CrewFeed({ focus }: { focus?: string | null }) {
   const { pkg, clock } = useMatch()
   const { time } = useClock(clock, 2)
-  const [spoilers, setSpoilers] = useState(false)
+  const [all, setAll] = useState(false)
   const moments = pkg.analytics.moments
-  const visible = useMemo(() => (spoilers ? moments : moments.filter((m) => m.ts <= time + 1)).slice().reverse(), [moments, time, spoilers])
+  const visible = useMemo(() => (all ? moments : moments.filter((m) => m.ts <= time + 1)).slice().reverse(), [moments, time, all])
+
+  useEffect(() => {
+    if (focus) document.getElementById(`moment-${focus}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [focus])
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-baseline justify-between gap-3 pb-2">
-        <span className="label">
-          <span className="num text-ink">{visible.length}</span> of <span className="num">{moments.length}</span> key moments
+      <div className="flex items-center justify-between px-5 py-2.5">
+        <span className="cond text-ink-3">
+          <span className="text-ink tab-num">{visible.length}</span>/{moments.length} moments
         </span>
-        <button onClick={() => setSpoilers((s) => !s)} className="link">
-          {spoilers ? 'Follow the replay' : 'Show every moment'}
-        </button>
+        <div className="seg">
+          <button aria-pressed={!all} onClick={() => setAll(false)}>
+            Follow replay
+          </button>
+          <button aria-pressed={all} onClick={() => setAll(true)}>
+            All
+          </button>
+        </div>
       </div>
       {visible.length === 0 && (
-        <div className="flex flex-1 flex-col items-start justify-center border-t border-rule py-10">
-          <p className="display text-[26px] leading-snug italic-wonk">The crew is in the press box.</p>
-          <p className="mt-2 max-w-[38ch] text-[15px] text-ink-3">
-            Press play. Each key moment is reported here as the replay reaches it, written for you and checked before it
-            is printed.
+        <div className="flex flex-1 flex-col justify-center px-6 pb-10">
+          <div className="xp text-[30px] leading-[0.95]">
+            Press play.
+            <br />
+            <span className="xp-light">The crew is ready.</span>
+          </div>
+          <p className="mt-4 max-w-[34ch] text-[14px] text-ink-3">
+            Each key moment is written up here, for you, as the replay reaches it, and checked by code before it is shown.
           </p>
         </div>
       )}
-      <div className="scroll-ink -mr-3 flex-1 overflow-y-auto pr-3">
+      <div className="scroll-slim flex-1 overflow-y-auto">
         {visible.map((m) => (
           <Entry key={m.id} moment={m} />
         ))}
@@ -83,53 +95,52 @@ function Entry({ moment }: { moment: Moment }) {
   }
 
   return (
-    <article className="rise grid grid-cols-[52px_1fr] gap-4 border-t border-rule py-5">
-      <div className="pt-1">
-        <div className={`num text-[17px] leading-none font-semibold ${isGoal ? 'text-signal' : 'text-ink'}`}>{moment.clock}</div>
-        <div className="mt-2 h-8 w-[3px]" style={{ background: teamInk(team) }} aria-hidden />
+    <article id={`moment-${moment.id}`} className="wipe-up border-t border-line px-5 py-5">
+      <div className="flex items-stretch">
+        <span className="cut-l flex items-center px-2.5 xp text-[13px] tab-num" style={isGoal ? { background: 'var(--color-flare)', color: '#fff' } : { background: 'var(--color-ink)', color: 'var(--color-volt)' }}>
+          {moment.clock}
+        </span>
+        <span className="cut-r flex items-center pr-4 pl-2 cond text-[11px]" style={{ background: team.primary, color: onPrimary(team) }}>
+          {KICKER[moment.type] ?? moment.type}
+        </span>
       </div>
-      <div className="min-w-0">
-        <div className={`label ${isGoal ? 'text-signal' : ''}`}>
-          {KICKER[moment.type] ?? moment.type} · {moment.team_name}
-        </div>
-        <h3 className={`display mt-1 leading-snug font-semibold ${isGoal ? 'text-[22px]' : 'text-[18px]'}`}>{moment.title}</h3>
-        <div className="mt-2">
-          {story ? (
-            <div className="ink-in">
-              <StoryText text={story.text} />
-            </div>
-          ) : error ? (
-            <p className="text-[14px] text-signal">{error}</p>
-          ) : (
-            <p className="typing text-[15px] text-ink-3 italic">The crew is writing</p>
-          )}
-        </div>
-        <footer className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {story && <VerifiedBadge verdict={story.verdict} mode={story.mode} />}
-          {moment.evidence.length > 0 && (
-            <button onClick={replay} className="link">
-              Replay
-            </button>
-          )}
-          {speechAvailable && story && (
-            <button
-              onClick={() => {
-                if (speaking) {
-                  stopSpeaking()
-                  setSpeaking(false)
-                } else {
-                  setSpeaking(true)
-                  speak(story.text, lang, () => setSpeaking(false))
-                }
-              }}
-              className="link"
-            >
-              {speaking ? 'Stop' : 'Listen'}
-            </button>
-          )}
-          {story && <TraceButton trace={story.trace} title={`${moment.clock} ${moment.title}`} />}
-        </footer>
+      <h3 className={`mt-2.5 leading-tight font-bold ${isGoal ? 'xp text-[19px]' : 'text-[17px] [font-stretch:110%]'}`}>{moment.title}</h3>
+      <div className="mt-2">
+        {story ? (
+          <div className="fade-in">
+            <StoryText text={story.text} />
+          </div>
+        ) : error ? (
+          <p className="text-[13px] text-flare">{error}</p>
+        ) : (
+          <p className="working cond text-ink-3">The crew is writing</p>
+        )}
       </div>
+      <footer className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+        {story && <VerifiedBadge verdict={story.verdict} mode={story.mode} />}
+        {moment.evidence.length > 0 && (
+          <button onClick={replay} className="act">
+            ▶ Replay in 3D
+          </button>
+        )}
+        {speechAvailable && story && (
+          <button
+            onClick={() => {
+              if (speaking) {
+                stopSpeaking()
+                setSpeaking(false)
+              } else {
+                setSpeaking(true)
+                speak(story.text, lang, () => setSpeaking(false))
+              }
+            }}
+            className="act"
+          >
+            {speaking ? '■ Stop' : '♪ Listen'}
+          </button>
+        )}
+        {story && <TraceButton trace={story.trace} title={`${moment.clock} ${moment.title}`} />}
+      </footer>
     </article>
   )
 }

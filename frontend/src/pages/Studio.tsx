@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../lib/settings'
 import { speak, speechAvailable, stopSpeaking } from '../lib/speech'
+import { onPrimary } from '../lib/ui'
 
 /**
  * Broadcast graphics for studios and streamers: a 1920x1080 layer driven by the live
@@ -45,7 +46,7 @@ export default function Studio({ matchId }: { matchId: string }) {
   const settings = useSettings()
   const p = params()
   const cleanMode = p.get('clean') === '1'
-  const bg = p.get('bg') ?? 'paper'
+  const bg = p.get('bg') ?? 'turf'
   const [persona, setPersona] = useState(p.get('persona') ?? settings.persona)
   const [lang, setLang] = useState(p.get('lang') ?? settings.lang)
   const [speed, setSpeed] = useState(Number(p.get('speed') ?? 8))
@@ -120,31 +121,30 @@ export default function Studio({ matchId }: { matchId: string }) {
   }, [running, matchId, persona, lang, speed])
 
   const obsUrl = `${window.location.origin}/#/studio/${matchId}?clean=1&bg=green&persona=${persona}&lang=${lang}&speed=${speed}${voice ? '&voice=1' : ''}`
-  const background =
-    bg === 'green' ? '#00b140' : bg === 'transparent' ? 'transparent' : '#f2eee3 repeating-linear-gradient(90deg, #ebe5d6 0 120px, #f2eee3 120px 240px)'
+  const background = bg === 'green' ? '#00b140' : bg === 'transparent' ? 'transparent' : 'repeating-linear-gradient(90deg, #3f7d34 0 120px, #4a8a3c 120px 240px)'
 
   return (
-    <div className="fixed inset-0 z-40 overflow-hidden bg-paper">
+    <div className="fixed inset-0 z-40 overflow-hidden bg-ink">
       {!cleanMode && (
-        <div className="flex h-16 items-center gap-5 border-b border-ink px-5">
-          <a href={`#/match/${matchId}`} className="link">
-            &larr; Match
+        <div className="flex h-16 items-center gap-5 bg-ink px-5 text-white">
+          <a href={`#/match/${matchId}`} className="act !text-white/70 hover:!text-white">
+            ← Match
           </a>
-          <span className="display text-[22px] font-semibold">
-            Studio <span className="italic-wonk font-normal text-signal">overlay</span>
+          <span className="xp text-[18px]">
+            Studio<span className="xp-light text-white/50"> / overlay</span>
           </span>
-          <span className="hidden label xl:inline">Live SSE feed · 1920×1080 graphics layer</span>
-          <span className="ml-auto text-[15px] text-ink-2">
+          <span className="hidden cond text-white/40 xl:inline">Live SSE feed · 1920×1080 graphics layer</span>
+          <span className="ml-auto text-[14px] text-white/70">
             For{' '}
-            <select value={persona} onChange={(e) => setPersona(e.target.value)} className="inline-select" aria-label="Audience">
+            <select value={persona} onChange={(e) => setPersona(e.target.value)} className="pick text-white" aria-label="Audience">
               {Object.entries(settings.options?.personas ?? { fan: 'Casual fan' }).map(([k, v]) => (
                 <option key={k} value={k}>
-                  {v.toLowerCase()}
+                  {v}
                 </option>
               ))}
             </select>{' '}
             in{' '}
-            <select value={lang} onChange={(e) => setLang(e.target.value)} className="inline-select" aria-label="Language">
+            <select value={lang} onChange={(e) => setLang(e.target.value)} className="pick text-white" aria-label="Language">
               {Object.entries(settings.options?.languages ?? { en: 'English' }).map(([k, v]) => (
                 <option key={k} value={k}>
                   {v}
@@ -152,16 +152,16 @@ export default function Studio({ matchId }: { matchId: string }) {
               ))}
             </select>{' '}
             at{' '}
-            <select value={speed} onChange={(e) => setSpeed(+e.target.value)} className="inline-select" aria-label="Speed">
+            <select value={speed} onChange={(e) => setSpeed(+e.target.value)} className="pick text-white" aria-label="Speed">
               {[1, 4, 8, 16, 32].map((s) => (
                 <option key={s} value={s}>
-                  ×{s}
+                  {s}×
                 </option>
               ))}
             </select>
           </span>
           {speechAvailable && (
-            <label className="label flex items-center gap-1.5">
+            <label className="flex items-center gap-1.5 cond text-white/60">
               <input type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} /> Voice
             </label>
           )}
@@ -171,12 +171,12 @@ export default function Studio({ matchId }: { matchId: string }) {
               setCopied(true)
               setTimeout(() => setCopied(false), 1500)
             }}
-            className="link"
+            className="act !text-white/70 hover:!text-white"
             title={obsUrl}
           >
-            {copied ? 'Copied ✓' : 'Copy OBS URL'}
+            {copied ? '✓ Copied' : 'Copy OBS URL'}
           </button>
-          <button onClick={() => setRunning((r) => !r)} className="btn btn-solid">
+          <button onClick={() => setRunning((r) => !r)} className="btn btn-volt">
             {running ? '■ Stop' : '● Go live'}
           </button>
         </div>
@@ -185,81 +185,93 @@ export default function Studio({ matchId }: { matchId: string }) {
       <div className="relative mx-auto overflow-hidden" style={{ width: 1920 * scale, height: 1080 * scale }}>
         <div className="absolute top-0 left-0" style={{ width: 1920, height: 1080, transform: `scale(${scale})`, transformOrigin: '0 0', background }}>
           {!running && !cleanMode && (
-            <div className="absolute inset-0 grid place-items-center text-center">
+            <div className="absolute inset-0 grid place-items-center text-center text-white">
               <div>
-                <div className="label text-[22px] text-signal">Studio overlay</div>
-                <div className="display mt-4 text-[96px] leading-none font-semibold">
-                  Ready for <span className="italic-wonk font-normal">air.</span>
+                <div className="flex justify-center">
+                  <span className="cut-both bg-volt px-6 py-2 cond text-[22px] text-ink">Studio overlay</span>
                 </div>
-                <p className="mt-6 text-[30px] text-ink-2 italic">Choose the audience and language, then press Go live.</p>
-                <p className="mt-2 text-[24px] text-ink-3">Add the OBS URL as a 1920×1080 browser source over your match feed.</p>
+                <div className="xp mt-8 text-[120px]">
+                  Ready for <span className="text-volt">air.</span>
+                </div>
+                <p className="mt-6 text-[30px] text-white/80">Choose the audience and language, then press Go live.</p>
+                <p className="mt-2 text-[24px] text-white/55">Add the OBS URL as a 1920×1080 browser source over your match feed.</p>
               </div>
             </div>
           )}
 
           {teams && (
-            <div className="absolute top-14 left-16 flex items-stretch shadow-[8px_8px_0_rgba(20,19,16,0.9)]">
-              <div className="flex items-center gap-4 bg-ink px-7 font-cond text-[40px] font-semibold tracking-[0.12em] text-paper">
-                <span className="h-9 w-3" style={{ background: teams.home.primary }} />
+            <div className="absolute top-14 left-16 flex h-[78px] items-stretch shadow-[0_12px_40px_rgba(0,0,0,0.45)]">
+              <div className="cut-l flex items-center bg-ink pr-6 pl-10">
+                <span className="h-9 w-4 -skew-x-[18deg] bg-volt" />
+              </div>
+              <div className="flex items-center px-7 xp text-[38px]" style={{ background: teams.home.primary, color: onPrimary(teams.home) }}>
                 {teams.home.short}
               </div>
-              <div className="display flex items-center bg-paper px-8 text-[64px] leading-none font-semibold tabular-nums">
+              <div className="flex min-w-[170px] items-center justify-center bg-white px-7 xp text-[48px] tab-num">
                 {clock.score.home}
-                <span className="px-3 text-ink-4">–</span>
+                <span className="xp-light px-3 text-ink-4">-</span>
                 {clock.score.away}
               </div>
-              <div className="flex items-center gap-4 bg-ink px-7 font-cond text-[40px] font-semibold tracking-[0.12em] text-paper">
+              <div className="flex items-center px-7 xp text-[38px]" style={{ background: teams.away.primary, color: onPrimary(teams.away) }}>
                 {teams.away.short}
-                <span className="h-9 w-3" style={{ background: teams.away.primary }} />
               </div>
-              <div className="flex min-w-[170px] items-center justify-center gap-3 bg-signal px-6 num text-[34px] text-paper">
-                {!ended && <span className="live-dot !h-3 !w-3 !bg-paper" />}
-                {ended ? 'FT' : clock.clock}
+              <div className="cut-r flex min-w-[170px] items-center justify-center gap-4 bg-ink pr-10 pl-6 text-volt">
+                {!ended && <span className="live-pip !h-4 !w-4" />}
+                <span className="xp text-[34px] tab-num">{ended ? 'FT' : clock.clock}</span>
               </div>
             </div>
           )}
 
           {teams && (
-            <div className="absolute top-16 right-16 text-right">
-              <div className="display text-[44px] leading-none font-semibold">
-                Match<span className="italic-wonk font-normal text-signal">Mind</span>
-              </div>
-              <div className="mt-1 label text-[16px] text-ink-2">AI crew · fact-checked live</div>
+            <div className="absolute top-16 right-16 flex items-stretch">
+              <span className="cut-l flex items-center gap-3 bg-ink py-3 pr-5 pl-8 xp text-[26px] text-white">
+                <span className="flex h-7 gap-1">
+                  <span className="w-3 -skew-x-[18deg] bg-volt" />
+                  <span className="w-3 -skew-x-[18deg] bg-white" />
+                </span>
+                MatchMind
+              </span>
+              <span className="cut-r flex items-center bg-volt pr-8 pl-4 cond text-[18px] text-ink">AI crew · fact-checked</span>
             </div>
           )}
 
           {goalFlash && teams && (
-            <div className="rise absolute inset-x-0 top-[30%] text-center">
-              <div className="inline-block bg-ink px-24 py-10 shadow-[14px_14px_0_#e3361b]">
-                <div className="display text-[190px] leading-[0.85] font-semibold text-paper italic-wonk">Goal.</div>
-                <div className="mt-4 label text-[34px] text-paper">{goalFlash}</div>
+            <div className="absolute inset-0 grid place-items-center overflow-hidden">
+              <div className="wipe absolute inset-y-[28%] -right-20 -left-20 -skew-y-3 bg-flare" />
+              <div className="wipe relative text-center text-white" style={{ animationDelay: '0.12s' }}>
+                <div className="xp text-[240px] leading-[0.8]">Goal</div>
+                <div className="mt-6 cond text-[34px]">{goalFlash}</div>
               </div>
             </div>
           )}
 
           {lower && teams && (
-            <div key={lower.id} className="rise absolute right-16 bottom-32 left-16 bg-paper shadow-[10px_10px_0_rgba(20,19,16,0.9)]" style={{ borderLeft: `18px solid ${teams[lower.team].primary}` }}>
-              <div className="flex items-center gap-6 border-b border-ink px-10 py-5">
-                <span className={`num text-[44px] font-semibold ${lower.type === 'goal' ? 'text-signal' : ''}`}>{lower.clock}</span>
-                <span className={`label text-[22px] ${lower.type === 'goal' ? 'text-signal' : 'label-ink'}`}>{KICKER[lower.type] ?? lower.type}</span>
-                <span className="display truncate text-[42px] font-semibold">{lower.title}</span>
-                {lower.text && lower.verified && (
-                  <span className="stamp stamp-in ml-auto shrink-0 text-[20px] text-proof">
-                    ✓ Fact-checked{lower.numbers ? ` · ${lower.numbers}` : ''}
-                  </span>
-                )}
+            <div key={lower.id} className="wipe-up absolute right-16 bottom-32 left-16 shadow-[0_16px_50px_rgba(0,0,0,0.45)]">
+              <div className="flex h-[70px] items-stretch">
+                <span className="cut-l flex items-center px-8 xp text-[34px] tab-num" style={lower.type === 'goal' ? { background: 'var(--color-flare)', color: '#fff' } : { background: 'var(--color-ink)', color: 'var(--color-volt)' }}>
+                  {lower.clock}
+                </span>
+                <span className="flex items-center px-6 cond text-[22px]" style={{ background: teams[lower.team].primary, color: onPrimary(teams[lower.team]) }}>
+                  {KICKER[lower.type] ?? lower.type}
+                </span>
+                <span className="cut-r flex min-w-0 flex-1 items-center bg-white pr-12 pl-6 xp text-[32px]">
+                  <span className="truncate">{lower.title}</span>
+                </span>
               </div>
-              <div className="min-h-32 px-10 py-6 text-[32px] leading-snug text-ink-2">
-                {lower.text ?? <span className="typing text-ink-3 italic">The crew is writing</span>}
+              <div className="bg-white px-10 pt-5 pb-6">
+                <p className="text-[30px] leading-snug text-ink-2">{lower.text ?? <span className="working cond text-[24px] text-ink-3">The crew is writing</span>}</p>
+                {lower.text && lower.verified && (
+                  <span className="cut-both mt-4 inline-block bg-ink px-4 py-1 cond text-[18px] text-volt">✓ Fact-checked{lower.numbers ? ` · ${lower.numbers} figures` : ''}</span>
+                )}
               </div>
             </div>
           )}
 
           {ticker.length > 0 && teams && (
             <div className="absolute inset-x-0 bottom-0 flex h-[72px] items-center gap-12 overflow-hidden bg-ink px-16 whitespace-nowrap">
-              <span className="bg-signal px-4 py-1 label text-[22px] text-paper">Live</span>
+              <span className="cut-both bg-flare px-5 py-1 cond text-[22px] text-white">Live</span>
               {ticker.map((t) => (
-                <span key={t.id} className="rise num text-[24px] text-paper">
+                <span key={t.id} className="fade-in text-[24px] font-semibold text-white">
                   {t.label}
                 </span>
               ))}

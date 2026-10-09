@@ -12,7 +12,7 @@ interface Turn {
   error?: string
 }
 
-/** Questions to the Host agent, set as an interview: the question as a pull quote, the answer as copy. */
+/** Questions to the Host agent, who looks things up through the match-data tools and answers with proof. */
 export default function AskPanel() {
   const { pkg } = useMatch()
   const { persona, lang } = useSettings()
@@ -29,13 +29,14 @@ export default function AskPanel() {
     'Who ran the most, and who was the fastest?',
   ]
 
+  const scroll = () => setTimeout(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }), 40)
   const send = async (question: string) => {
     if (question.trim().length < 3 || busy) return
     setQ('')
     setBusy(true)
     const idx = turns.length
     setTurns((t) => [...t, { q: question }])
-    setTimeout(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }), 30)
+    scroll()
     try {
       const a = await api.ask(pkg.meta.id, question, persona, lang)
       setTurns((t) => t.map((x, i) => (i === idx ? { ...x, a } : x)))
@@ -43,29 +44,31 @@ export default function AskPanel() {
       setTurns((t) => t.map((x, i) => (i === idx ? { ...x, error: String((e as Error).message ?? e) } : x)))
     } finally {
       setBusy(false)
-      setTimeout(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }), 60)
+      scroll()
     }
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div ref={listRef} className="scroll-ink -mr-3 flex-1 overflow-y-auto pr-3">
+      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-5 pt-4">
         {turns.length === 0 && (
           <div>
-            <p className="display text-[24px] leading-snug">
-              Put a question to the <span className="italic-wonk">crew.</span>
+            <div className="xp text-[26px] leading-[0.95]">
+              Ask the crew
+              <br />
+              <span className="xp-light">anything.</span>
+            </div>
+            <p className="mt-3 text-[14px] text-ink-3">
+              The Host agent pulls the numbers through the match-data tools (MCP), asks the Tactician, can run what-if
+              simulations, and every answer is fact-checked.
             </p>
-            <p className="mt-2 text-[15px] text-ink-3">
-              The Host agent looks things up through the match-data tools (MCP), consults the Tactician, can run what-if
-              simulations, and its answer is fact-checked like everything else.
-            </p>
-            <ul className="mt-5 border-t border-ink">
-              {suggestions.map((s) => (
-                <li key={s} className="border-b border-rule">
-                  <button onClick={() => send(s)} className="group flex w-full items-baseline gap-3 py-3 text-left text-[16px] hover:text-signal">
-                    <span className="num text-[12px] text-signal">Q.</span>
-                    <span className="flex-1 italic">{s}</span>
-                    <span className="text-ink-4 transition-transform group-hover:translate-x-1 group-hover:text-signal">&rarr;</span>
+            <ul className="mt-5">
+              {suggestions.map((s, i) => (
+                <li key={s}>
+                  <button onClick={() => send(s)} className="group flex w-full items-center gap-3 border-t border-line py-3 text-left text-[14.5px] font-medium hover:bg-concrete">
+                    <span className="cond w-6 text-ink-4 tab-num group-hover:text-ink">0{i + 1}</span>
+                    <span className="flex-1">{s}</span>
+                    <span className="pr-1 text-ink-4 transition-transform group-hover:translate-x-1 group-hover:text-ink">→</span>
                   </button>
                 </li>
               ))}
@@ -73,16 +76,14 @@ export default function AskPanel() {
           </div>
         )}
         {turns.map((t, i) => (
-          <div key={i} className="rise border-b border-rule py-5 first:pt-0">
-            <blockquote className="relative pl-7">
-              <span className="display absolute -top-2 left-0 text-[44px] leading-none text-signal" aria-hidden>
-                &ldquo;
-              </span>
-              <p className="display text-[20px] leading-snug italic-wonk">{t.q}</p>
-            </blockquote>
-            <div className="mt-3 pl-7">
+          <div key={i} className="wipe-up pb-6">
+            <div className="flex justify-end">
+              <p className="cut-l max-w-[88%] bg-ink py-2.5 pr-4 pl-6 text-[14.5px] font-medium text-white">{t.q}</p>
+            </div>
+            <div className="mt-3">
+              <div className="cond text-[11px] text-ink-3">Host · {t.a ? 'answered' : 'working'}</div>
               {t.a ? (
-                <div className="ink-in">
+                <div className="fade-in mt-1">
                   <StoryText text={t.a.answer} />
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
                     <VerifiedBadge verdict={t.a.verdict} />
@@ -90,9 +91,9 @@ export default function AskPanel() {
                   </div>
                 </div>
               ) : t.error ? (
-                <p className="text-[14px] text-signal">{t.error}</p>
+                <p className="mt-1 text-[13px] text-flare">{t.error}</p>
               ) : (
-                <p className="typing text-[15px] text-ink-3 italic">The Host is looking it up</p>
+                <p className="working mt-1 text-[14px] text-ink-3">Calling the match-data tools</p>
               )}
             </div>
           </div>
@@ -103,18 +104,11 @@ export default function AskPanel() {
           e.preventDefault()
           send(q)
         }}
-        className="mt-3 flex items-end gap-3 border-t border-ink pt-2"
+        className="flex items-stretch gap-0 border-t border-line p-3"
       >
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Why did..., Who..., What if..."
-          className="field text-[17px]"
-          maxLength={400}
-          aria-label="Your question for the crew"
-        />
-        <button disabled={busy || q.trim().length < 3} className="btn btn-solid shrink-0">
-          Ask &rarr;
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Why did..., Who..., What if..." className="field" maxLength={400} aria-label="Your question for the crew" />
+        <button disabled={busy || q.trim().length < 3} className="btn btn-volt shrink-0 !px-5">
+          Ask
         </button>
       </form>
     </div>
