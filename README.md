@@ -142,7 +142,7 @@ Tools: `match_overview`, `get_moment`, `get_team_stats`, `get_player_stats`, `to
 
 ## Deploy to Azure
 
-Live demo: **https://matchmind.yellowground-bbb25fc7.japaneast.azurecontainerapps.io/**
+Live demo: **https://matchmind.blackisland-4799a434.japaneast.azurecontainerapps.io/**
 (MCP endpoint: `/mcp/`)
 
 ```bash
@@ -151,9 +151,10 @@ LOCATION=japaneast bash infra/deploy.sh      # Docker must be running
 ```
 
 Creates the resource group, a Microsoft Foundry (AI Services) resource with a `gpt-4.1-mini` deployment, an Azure
-Container Registry, and the Container App, then grants the app's system-assigned managed identity the
-*Cognitive Services OpenAI User* role - the running app holds no model keys. The image is built locally and pushed,
-because ACR cloud builds are not available on Azure for Students subscriptions.
+Container Registry, a WorkloadProfiles Container Apps environment (Log Analytics attached) and the app. The app's
+system-assigned managed identity pulls the image (*AcrPull*) and calls the model (*Cognitive Services OpenAI User*) -
+there are no registry passwords or model keys anywhere in production. The image is built locally and pushed, because
+ACR cloud builds are not available on Azure for Students subscriptions.
 
 ## Cost controls
 
