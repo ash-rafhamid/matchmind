@@ -190,6 +190,11 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
     restart: dict | None = None  # {"spot", "taker", "ts"} for the next set piece
     fixes: list[tuple] = []  # (event, field, frame, kind, col) filled in from the recording
     k = 0
+    move_rng = np.random.default_rng(seed + 211)  # how the player on the ball moves never shifts the match itself
+    plan: dict | None = None  # the carrier's current intention: {"who", "dir", "speed", "until", "calm"}
+    touch = {"who": -1, "dist": 0.0}  # distance run with the ball since the last change of owner (for touches)
+    fouls = sorted((e for e in events if e["type"] == "foul" and e.get("victim")), key=lambda e: e["ts"])
+    fi = 0
     reset_frames = set(period_starts)
     was_on = ~np.isnan(targets[0, :, 0])
 
@@ -198,6 +203,72 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
 
     def team_cols(home_side: bool, on: np.ndarray) -> np.ndarray:
         return np.nonzero(on & (side_arr == home_side))[0]
+
+    def carry_plan(j: int, t: float, on: np.ndarray, calm: bool) -> dict:
+        """What the player on the ball does next: run into space, beat a man, shield, or turn away."""
+        me = pos[j]
+        goal = np.array([goal_x[side_arr[j]], GOAL_Y])
+        fwd = _unit(goal - me)
+        base = fwd
+        mine = pending is not None and pending.get("owner") == j
+        if mine:
+            to_pass = pending["intent"] - me
+            if np.hypot(*to_pass) > 3.0:
+                tp = _unit(to_pass)
+                if np.dot(tp, fwd) > -0.3:
+                    base = _unit(fwd * 0.6 + tp * 0.8)
+                else:  # the ball is going back: drift across, don't run away from it
+                    base = _unit(np.array([0.0, 1.0 if tp[1] >= 0 else -1.0]) + fwd * 0.2)
+        time_left = (pending["at"] - t) if mine else 1.5
+        opps = team_cols(not side_arr[j], on)
+        if len(opps):
+            rel = pos[opps] - me
+            d = np.hypot(rel[:, 0], rel[:, 1])
+            near = int(np.argmin(d))
+            dn, un = float(d[near]), _unit(rel[near])
+            cosang = (rel @ base) / np.maximum(d, 1e-6)
+            ahead = d[(cosang > 0.5)]
+            ahead_d = float(ahead.min()) if len(ahead) else 99.0
+        else:
+            dn, un, ahead_d = 99.0, -base, 99.0
+        if calm:  # about to be fouled: holding it up, the challenge comes in
+            direction, speed, dur = _unit(base - un * 0.5), move_rng.uniform(1.0, 1.8), 0.5
+        elif dn < 2.3 and np.dot(un, base) > 0.2:
+            # tight marker in front: shield it and roll away from him
+            side = np.array([-un[1], un[0]])
+            if np.dot(side, base) < 0:
+                side = -side
+            direction, speed, dur = _unit(side - un * 0.4), move_rng.uniform(1.6, 2.6), 0.6
+        elif ahead_d > 10.0 and time_left > 0.9:
+            # open grass ahead: run with it
+            direction = base
+            speed = float(min(0.85 * vmax[j], move_rng.uniform(4.6, 6.2) + 0.06 * min(ahead_d - 10.0, 15.0)))
+            dur = 0.9
+        elif dn < 4.5:
+            # a man close by: go past him or away from him, at pace
+            direction, speed, dur = _unit(base - un * 0.7), move_rng.uniform(3.6, 5.2), 0.6
+        else:
+            direction, speed, dur = _unit(base - un * 0.35), move_rng.uniform(2.6, 3.8), 0.8
+        a = move_rng.normal(0.0, 0.15)
+        c, s_ = np.cos(a), np.sin(a)
+        direction = np.array([c * direction[0] - s_ * direction[1], s_ * direction[0] + c * direction[1]])
+        # stay on the pitch, and cut inside near the byline
+        if me[1] < 4.0:
+            direction[1] += 0.9
+        elif me[1] > PITCH_WIDTH - 4.0:
+            direction[1] -= 0.9
+        if abs(goal[0] - me[0]) < 14.0:
+            direction = direction + _unit(np.array([0.0, GOAL_Y - me[1]])) * 0.6
+            speed = min(speed, 4.0)
+        if me[0] < 3.0:
+            direction[0] += 0.9
+        elif me[0] > PITCH_LENGTH - 3.0:
+            direction[0] -= 0.9
+        if role_at[min(int(t * HZ), n - 1), j] == "GK":
+            speed = min(speed, 1.8)
+        if time_left < 0.5:
+            speed *= 0.8  # setting himself for the pass
+        return {"who": j, "dir": _unit(direction), "speed": float(speed), "until": t + dur, "calm": calm}
 
     def strike(e: dict, t: float, to: int | None, aim: np.ndarray, t1: float, peak: float, dead_after: bool) -> None:
         nonlocal flight, owner, dribble
@@ -306,21 +377,25 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 length = float(np.hypot(*(intent - pos[j])))
                 flight_s = float(np.clip(length / _ball_speed(length), 0.3, max(0.3, arrive - e["ts"] - 0.15)))
                 strike_at = max(e["ts"] + 0.1, arrive - flight_s)
-                hold = strike_at - e["ts"]
-                if hold > 0.8:  # take a touch and move with the ball towards the pass
-                    dribble = {"to": pos[j] + _clip_len(intent - pos[j], min(5.0, 0.25 * length + 1.0)), "speed": float(np.clip(3.0 / max(hold, 1.0) * 1.6, 1.2, 3.2))}
-                else:
-                    dribble = None
+                dribble = None
             receiver = col.get(e.get("receiver") or "") if e.get("outcome") == "complete" else None
             catcher = col.get(nxt["player"]) if nxt is not None and nxt["team"] != e["team"] and nxt["type"] in ("interception", "save", "block") else None
             if receiver is not None and on[receiver]:
                 roles[receiver] = {"to": intent, "chase": None, "until": arrive, "speed": "run"}
             if catcher is not None and on[catcher] and typ != "shot":
                 roles[catcher] = {"to": pos[j] + (intent - pos[j]) * 0.7, "chase": None, "until": arrive, "speed": "sprint"}
-            pending = {"e": e, "at": strike_at, "arrive": arrive, "intent": intent, "receiver": receiver, "catcher": catcher, "nxt": nxt}
+            pending = {"e": e, "at": strike_at, "arrive": arrive, "intent": intent, "receiver": receiver, "catcher": catcher, "nxt": nxt, "owner": j}
 
         # ------------------------------------------------ strikes that are due
-        if pending is not None and t >= pending["at"] and owner >= 0:
+        due = False
+        if pending is not None and owner >= 0:
+            if pending["e"]["type"] == "shot":
+                due = t >= pending["at"]
+            else:
+                gap_now = float(np.hypot(*(pending["intent"] - ball)))
+                need = float(np.clip(gap_now / _ball_speed(gap_now), 0.3, 3.0))
+                due = t >= pending["at"] - 0.6 and (pending["arrive"] - t <= need + 0.05 or t >= pending["arrive"] - 0.3)
+        if due:
             e = pending["e"]
             typ = e["type"]
             j = owner
@@ -404,6 +479,15 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
 
         # ------------------------------------------------ where everyone wants to go
         tgt = targets[f].copy()
+        if f > 6:
+            seen = np.maximum(f - lag, 0)
+            dx = ball_out[seen, 0] - hx[seen]
+            dy = ball_out[seen, 1] - hy[seen]
+            mine_ball = np.where(side_arr, poss_home[seen], ~poss_home[seen])
+            gk = role_at[f] == "GK"
+            ok = on & ~np.isnan(tgt[:, 0])
+            tgt[ok, 0] = np.clip(tgt[ok, 0] + (np.where(gk, 0.12, np.where(mine_ball, 0.55, 0.5)) * gain * dx)[ok], 1.0, PITCH_LENGTH - 1.0)
+            tgt[ok, 1] = np.clip(tgt[ok, 1] + (np.where(gk, 0.15, np.where(mine_ball, 0.22, 0.35)) * gain * dy)[ok], 1.0, PITCH_WIDTH - 1.0)
         urgent = np.zeros(P, dtype=bool)
         speed_cap = np.where(on, 7.0, 0.0)
         for j, r in list(roles.items()):
@@ -461,10 +545,29 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             tgt[j] = own_goal + _unit(to_ball) * float(np.clip(dist * 0.09, 1.2, 5.5))
             tgt[j][1] = float(np.clip(tgt[j][1], GOAL_Y - 5, GOAL_Y + 5))
         # the player on the ball goes where he is dribbling
+        while fi < len(fouls) and fouls[fi]["ts"] < t:
+            fi += 1
+        calm = False
+        if fi < len(fouls) and owner >= 0 and fouls[fi]["ts"] - t < 2.5 and col.get(fouls[fi]["victim"]) == owner:
+            # the man who will commit the foul closes him down
+            fj = col.get(fouls[fi].get("player") or "")
+            if fj is not None and on[fj] and fj not in roles:
+                roles[fj] = {"chase": owner, "to": None, "until": fouls[fi]["ts"], "speed": "sprint"}
+                tgt[fj] = pos[owner]
+                speed_cap[fj] = vmax[fj]
+                urgent[fj] = True
+            calm = True
         if owner >= 0 and on[owner]:
+            if dribble is not None and np.hypot(*(dribble["to"] - pos[owner])) < 0.8:
+                dribble = None  # the scripted carry is done: he keeps going on his own
             if dribble is not None:
                 tgt[owner] = dribble["to"]
                 speed_cap[owner] = dribble["speed"]
+            elif not dead and flight is None:
+                if plan is None or plan["who"] != owner or t >= plan["until"] or plan["calm"] != calm:
+                    plan = carry_plan(owner, t, on, calm)
+                tgt[owner] = pos[owner] + plan["dir"] * max(4.0, plan["speed"] * 1.5)
+                speed_cap[owner] = plan["speed"]
             else:
                 tgt[owner] = pos[owner]
                 speed_cap[owner] = 1.0
@@ -506,7 +609,16 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             ball = flight["p0"] + (flight["p1"] - flight["p0"]) * ease
             ball_z = flight["peak"] * 4 * u * (1 - u)
         elif owner >= 0 and on[owner] and not dead:
+            if touch["who"] != owner:
+                touch["who"], touch["dist"] = owner, 0.0
+            spd = float(np.hypot(*vel[owner]))
             target_ball = at_feet(owner)
+            if spd > 2.2:
+                touch["dist"] += spd * DT
+                stride = 1.4 + 0.35 * spd
+                cyc = (touch["dist"] % stride) / stride
+                push = cyc / 0.2 if cyc < 0.2 else (1.0 - cyc) / 0.8
+                target_ball = pos[owner] + face[owner] * (FEET + (0.15 + 0.16 * spd) * push)
             jump = float(np.hypot(*(target_ball - ball)))
             ball = target_ball if jump < 1.2 else ball + (target_ball - ball) * 0.45
             ball_z = 0.0

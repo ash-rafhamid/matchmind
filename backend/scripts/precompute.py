@@ -42,7 +42,12 @@ async def main(langs: list[str]) -> None:
     sem = asyncio.Semaphore(PARALLEL)
     stats = {"stored": 0, "skipped": 0, "fallback": 0}
 
+    keys_log = os.environ.get("KEYS_LOG")  # optional: record every key in use, to prune stale entries afterwards
+
     async def one(key: str, job: Job) -> None:
+        if keys_log:
+            with open(keys_log, "a", encoding="utf-8") as fh:
+                fh.write(key + "\n")
         if cache.get(key):
             stats["skipped"] += 1
             return

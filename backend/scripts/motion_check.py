@@ -48,6 +48,20 @@ def check(match_id: str) -> None:
     print(f"  ball in flight: median {np.median(bv[flying]):.1f} m/s, 90% {np.percentile(bv[flying], 90):.1f} m/s")
     print(f"  receiver/winner to ball when taking control: median {np.median(gaps):.2f} m, 95% {np.percentile(gaps, 95):.2f} m")
     print(f"  player on the ball standing still (<0.5 m/s): {100 * np.mean(carrier_speed < 0.5):.0f}% of the time, median speed {np.median(carrier_speed):.1f} m/s")
+    # each spell on the ball: how long, and how far the player travels with it
+    spells, start = [], None
+    for f in range(1, n):
+        if tr.on_ball[f] != tr.on_ball[f - 1]:
+            if start is not None and tr.on_ball[f - 1] >= 0:
+                j = tr.on_ball[f - 1]
+                path = tr.xy[start:f, j]
+                if not np.isnan(path).any() and f - start > 1:
+                    spells.append(((f - start) / HZ, float(np.hypot(*np.diff(path, axis=0).T).sum())))
+            start = f
+    sp_arr = np.array(spells)
+    longer = sp_arr[sp_arr[:, 0] >= 1.5]
+    print(f"  spells on the ball: {len(sp_arr)}, median {np.median(sp_arr[:, 0]):.1f}s; of those >=1.5s, median travel {np.median(longer[:, 1]):.1f} m, "
+          f"{100 * np.mean(longer[:, 1] / longer[:, 0] < 1.0):.0f}% move under 1 m/s; carrier running (>4 m/s) {100 * np.mean(carrier_speed > 4):.0f}% of the time")
     print(f"  all players: walking/standing {100 * np.mean(allsp < 2):.0f}% | jogging {100 * np.mean((allsp >= 2) & (allsp < 5.5)):.0f}% | running/sprinting {100 * np.mean(allsp >= 5.5):.0f}% | >10 m/s {100 * np.mean(allsp > 10):.2f}%")
     print(f"  players overlapping (<0.8 m apart): {close} pairs in {n // 50} sampled frames")
     phys = [v for v in tr.physical().values() if v["minutes"] > 85]
