@@ -245,7 +245,7 @@ export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull
       <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center sm:top-4">
         <div className="wipe flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
           <span className="cut-l flex items-center bg-flare ps-5 pe-3 xp text-[18px] text-white">{t('reel.replay')}</span>
-          <span className="cut-r flex items-center bg-ink pe-5 ps-3 cond text-volt">{t('reel.slowmo')} · 0.4×</span>
+          <span className="cut-r flex items-center bg-ink pe-5 ps-3 cond text-volt">{t('reel.slowmo')} · 0.5×</span>
         </div>
       </div>
     )
