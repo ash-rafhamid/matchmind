@@ -252,5 +252,7 @@
  "voice.on": "Kommentar an",
  "voice.off": "Kommentar aus",
  "home.crewLive": "KI-Kommentar",
- "home.factChecked": "Vom Code geprüft"
+ "home.factChecked": "Vom Code geprüft",
+ "cam.live": "Live",
+ "cam.closeup": "Nahaufnahme"
 }

@@ -195,3 +195,13 @@ export interface Health {
   ai: { provider: string; model: string | null; enabled: boolean }
   matches: number
 }
+
+/** One play-by-play call the commentator can make (built on the server from the events). */
+export interface CommentaryLine {
+  id: string
+  ts: number
+  text: string
+  /** 4 must be said, 0 only fills a silence. */
+  prio: number
+  excited: boolean
+}

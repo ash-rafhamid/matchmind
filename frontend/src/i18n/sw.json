@@ -252,5 +252,7 @@
  "voice.on": "Maoni wameshika",
  "voice.off": "Maoni yamezimwa",
  "home.crewLive": "Maoni ya AI",
- "home.factChecked": "Imethibitishwa na msimbo"
+ "home.factChecked": "Imethibitishwa na msimbo",
+ "cam.live": "Moja kwa moja",
+ "cam.closeup": "Picha ya karibu"
 }

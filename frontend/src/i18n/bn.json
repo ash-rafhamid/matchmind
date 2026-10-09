@@ -252,5 +252,7 @@
  "voice.on": "কমেন্টারি চালু",
  "voice.off": "কমেন্টারি বন্ধ",
  "home.crewLive": "এআই কমেন্টারি",
- "home.factChecked": "কোড দ্বারা যাচাই"
+ "home.factChecked": "কোড দ্বারা যাচাই",
+ "cam.live": "লাইভ",
+ "cam.closeup": "ক্লোজ-আপ"
 }

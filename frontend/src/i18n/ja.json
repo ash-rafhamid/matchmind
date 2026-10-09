@@ -252,5 +252,7 @@
  "voice.on": "解説オン",
  "voice.off": "解説オフ",
  "home.crewLive": "AI解説",
- "home.factChecked": "コードで事実確認済み"
+ "home.factChecked": "コードで事実確認済み",
+ "cam.live": "ライブ",
+ "cam.closeup": "クローズアップ"
 }

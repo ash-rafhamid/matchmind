@@ -1,17 +1,18 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
-import { CamCut, CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, RestartCut, ScoreBug, Transport, useAtmosphere, useCamCut, useCrossings, type PlayMode } from '../components/Broadcast'
+import { CamCut, CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, ReplayBug, ScoreBug, Transport, useAtmosphere, useCamCut, useCrossings, type PlayMode } from '../components/Broadcast'
 import CrewFeed from '../components/CrewFeed'
 import RecapPanel from '../components/RecapPanel'
 import StatsPanel from '../components/StatsPanel'
 import WhatIfPanel from '../components/WhatIfPanel'
 import { PlaybackClock } from '../lib/clock'
 import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
-import { buildReel, buildSkips, ReelDirector, type ReelState } from '../lib/reel'
+import { Commentator } from '../lib/commentator'
+import { BreakDirector, buildBreaks, buildReel, ReelDirector, type BreakState, type ReelState } from '../lib/reel'
 import { Atmosphere } from '../lib/sound'
 import { TrackingStore } from '../lib/tracking'
-import { useT } from '../lib/settings'
+import { useSettings, useT } from '../lib/settings'
 import { onPrimary } from '../lib/ui'
 import type { CameraMode } from '../scene/Stadium'
 import type { MatchEvent, MatchPackage, Moment, Side } from '../types'
@@ -47,7 +48,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const [highlight, setHighlight] = useState<number[]>([])
   const [tab, setTab] = useState<Tab>('live')
   const [cam, setCam] = useState<CameraMode>('director')
-  const { cut: camCut, onCut, pick: pickCam } = useCamCut(setCam)
+  const { cut: camCut, onCut, pick: pickCam, flash } = useCamCut(setCam)
   const [lower, setLower] = useState<Moment | null>(null)
   const [goal, setGoal] = useState<MatchEvent | null>(null)
   const [focusMoment, setFocusMoment] = useState<string | null>(null)
@@ -112,11 +113,30 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
     }
   }
 
-  // full match: cut dead-ball stretches like TV, straight to just before the restart
-  const skips = useMemo(() => buildSkips(pkg), [pkg])
-  const [cutTo, setCutTo] = useState<MatchEvent | null>(null)
+  // full match: stoppages handled like TV - a slow-motion replay of the goal or the foul, then back for the restart
+  const breaks = useMemo(() => buildBreaks(pkg), [pkg])
+  const [brk, setBrk] = useState<BreakState>({ phase: 'live', brk: null, cuts: 0 })
   const replaying = useRef(false)
-  replaying.current = reel.phase === 'replay' || (reel.phase === 'cut' && reel.cutTo === 'replay')
+  replaying.current = reel.phase === 'replay' || (reel.phase === 'cut' && reel.cutTo === 'replay') || brk.phase === 'replay'
+
+  // the commentator: play-by-play in a neural voice, and the crew's analysis after big moments
+  const { lang, persona } = useSettings()
+  const comm = useMemo(() => new Commentator(pkg.meta.id, lang, clock), [pkg.meta.id, lang, clock])
+  useEffect(() => () => comm.dispose(), [comm])
+  useEffect(() => comm.setEnabled(voice), [comm, voice])
+  useEffect(() => {
+    comm.replaying = replaying.current
+  })
+  useEffect(() => {
+    comm.onDuck = (on) => atm.current?.duck(on)
+  }, [comm])
+  const onMoment = useCallback(
+    (m: Moment) => {
+      setLower(m)
+      comm.moment(m.id, persona)
+    },
+    [comm, persona],
+  )
   useEffect(() => director.subscribe(setReel), [director])
   useEffect(() => {
     director.onExit = () => setModeState('full')
@@ -134,38 +154,30 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   }
   useEffect(() => {
     if (mode !== 'full') return
-    // dead ball: keep playing, just faster, until shortly before the restart - no freeze, no jump
-    let base: number | null = null
-    const off = clock.subscribe(() => {
-      const t = clock.time
-      const s = clock.playing ? skips.find((k) => t >= k.from && t < k.to) : undefined
-      if (s && base === null) {
-        base = clock.speed
-        store.prefetch(s.to)
-        clock.setSpeed(Math.max(base, 10))
-        setCutTo(s.restart)
-      } else if (!s && base !== null) {
-        const restore = base
-        base = null
-        clock.setSpeed(restore)
-        setCutTo(null)
-      }
+    const bd = new BreakDirector(clock, store, breaks)
+    const off = bd.subscribe((s) => {
+      setBrk(s)
+      flash(s.phase === 'replay' ? 'replay' : 'live')
     })
     return () => {
       off()
-      if (base !== null) clock.setSpeed(base)
+      bd.stop()
+      setBrk({ phase: 'live', brk: null, cuts: 0 })
     }
-  }, [mode, clock, skips, store])
+  }, [mode, clock, store, breaks, flash])
 
   const onPlay = () => {
     if (sound) startAudio()
+    comm.unlock()
     if (mode === 'highlights') {
       if (reel.phase === 'off' || reel.phase === 'done') director.start()
       else if (clock.playing) clock.pause()
       else clock.play()
     } else clock.toggle()
   }
-  const replayDir = reel.phase === 'replay' && reel.clip?.goal ? (reel.clip.goal.team === 'home' ? 1 : -1) : null
+  const brkReplay = brk.phase === 'replay' ? brk.brk?.replay ?? null : null
+  const replayDir = brkReplay ? brkReplay.dir : reel.phase === 'replay' && reel.clip?.goal ? (reel.clip.goal.team === 'home' ? 1 : -1) : null
+  const replayAngle = brkReplay ? brkReplay.angle : 'goal'
   useEffect(() => store.prefetch(0), [store])
 
   const focusEvidence = useCallback(
@@ -200,13 +212,13 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 
   return (
     <MatchCtx.Provider value={value}>
-      <CrossingWatch goals={goals} onGoal={setGoal} onMoment={setLower} muted={replaying} />
+      <CrossingWatch goals={goals} onGoal={setGoal} onMoment={onMoment} muted={replaying} />
       <AtmosphereWatch atm={atm} store={store} replaying={replaying} />
       <div className="grid xl:h-[calc(100vh-52px)] xl:grid-cols-[minmax(0,1fr)_440px]">
         <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
           <div className="relative min-h-[340px] flex-1">
             <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">{t('app.loadingStadium')}</p>}>
-              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} replay={replayDir} onCut={onCut} className="absolute inset-0" />
+              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} replay={replayDir} replayAngle={replayAngle} onCut={onCut} className="absolute inset-0" />
             </Suspense>
             <div className="stage-shade pointer-events-none absolute inset-0" />
             <CamCut cut={camCut} />
@@ -224,7 +236,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               </div>
             </div>
             {goal && <GoalTakeover key={goal.id} goal={goal} />}
-            {cutTo && <RestartCut to={cutTo} />}
+            {brkReplay && <ReplayBug />}
             {mode === 'highlights' && (
               <ReelOverlay
                 reel={reel}
@@ -240,7 +252,6 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
                 <LowerThird
                   key={lower.id}
                   moment={lower}
-                  voice={voice}
                   onDone={() => setLower(null)}
                   onOpen={() => {
                     setTab('live')

@@ -252,5 +252,7 @@
  "voice.on": "Comentário ligado",
  "voice.off": "Comentário desligado",
  "home.crewLive": "Comentário AI",
- "home.factChecked": "Verificado por código"
+ "home.factChecked": "Verificado por código",
+ "cam.live": "Ao vivo",
+ "cam.closeup": "Close-up"
 }

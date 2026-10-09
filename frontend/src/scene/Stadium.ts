@@ -151,11 +151,13 @@ export class Stadium {
   private ballEvents: MatchEvent[]
   private shots: Shot[]
   /** When each goal's ball crosses the line, in match time. */
-  private goalsIn: { side: Side; from: number }[]
+  private goalsIn: { side: Side; from: number; pid: string | null }[]
 
   private mode: CameraMode = 'director'
   private tour = false
-  private override: { shot: 'replay'; dir: 1 | -1 } | null = null
+  private override: { shot: 'replay' | 'closeup'; dir: 1 | -1 } | null = null
+  /** Where the scorer is while his side celebrates (the celebration camera follows him). */
+  private scorerAt: { x: number; z: number } | null = null
   private camPos = new THREE.Vector3()
   private camLook = new THREE.Vector3()
   private focus = new THREE.Vector3()
@@ -202,7 +204,7 @@ export class Stadium {
     this.composer.addPass(new OutputPass())
 
     this.ballEvents = pkg.events.filter((e) => BALL_TYPES.has(e.type))
-    this.goalsIn = pkg.events.filter((e) => e.type === 'shot' && e.outcome === 'goal').map((e) => ({ side: e.team, from: e.ts + e.dur }))
+    this.goalsIn = pkg.events.filter((e) => e.type === 'shot' && e.outcome === 'goal').map((e) => ({ side: e.team, from: e.ts + e.dur, pid: e.player }))
     this.shots = pkg.events
       .filter((e) => e.type === 'shot' && (e.outcome === 'goal' || e.outcome === 'saved' || (e.xg ?? 0) >= 0.12))
       .map((e) => ({ ts: e.ts, dir: e.team === 'home' ? 1 : -1, goal: e.outcome === 'goal' }))
@@ -249,8 +251,8 @@ export class Stadium {
   }
 
   /** Take the camera for a replay (low, behind the goal being scored in), or give it back. */
-  setReplay(dir: 1 | -1 | null) {
-    this.override = dir ? { shot: 'replay', dir } : null
+  setReplay(dir: 1 | -1 | null, angle: 'goal' | 'closeup' = 'goal') {
+    this.override = dir ? { shot: angle === 'closeup' ? 'closeup' : 'replay', dir } : null
     this.idleFrames = 0
   }
 
@@ -762,13 +764,16 @@ export class Stadium {
       if (party) {
         // the scoring side celebrates: arms up, jumping
         const wave = performance.now() / 1000
-        bob = Math.abs(Math.sin(wave * 7 + i)) * 0.2
-        thighL = thighR = 0
-        kneeL = kneeR = 0.15
         armL = -2.7 + 0.25 * Math.sin(wave * 9 + i)
         armR = -2.7 + 0.25 * Math.cos(wave * 9 + i)
         elbowL = elbowR = -0.2
         pitch = 0
+        if (b.speed < 1.2) {
+          // standing: jump for joy (running players keep their stride, arms up)
+          bob = Math.abs(Math.sin(wave * 7 + i)) * 0.2
+          thighL = thighR = 0
+          kneeL = kneeR = 0.15
+        }
       }
       // football movements: kicks, tackles, slides, falls, dives
       const act = cues.get(i)
@@ -981,6 +986,8 @@ export class Stadium {
     // a goal: the scoring end jumps
     // (tied to match time, so it holds after a seek or fast-forward and never shows before the ball is in)
     const scored = this.goalsIn.find((g) => t >= g.from && t < g.from + 7)
+    const who = scored?.pid ? this.ids.indexOf(scored.pid) : -1
+    this.scorerAt = who >= 0 && this.bodies[who]?.has ? { x: this.bodies[who].x, z: this.bodies[who].z } : null
     if (scored && this.cheer?.from !== scored.from) this.cheer = { side: scored.side, from: scored.from, until: scored.from + 7 }
 
     // hover: name, number and speed
@@ -1018,6 +1025,13 @@ export class Stadium {
   // ------------------------------------------------------------------ the director
 
   private directorShot(t: number): 'broadcast' | 'goal' | 'celebrate' | 'follow' | 'tactical' {
+    if (this.tour) {
+      const g = this.shots.find((s) => s.goal && t >= s.ts - 16 && t <= s.ts + 9)
+      if (g) {
+        const dt = t - g.ts
+        return dt < -8 ? 'broadcast' : dt < -2.4 ? 'follow' : dt <= 1.8 ? 'goal' : 'celebrate'
+      }
+    }
     for (const s of this.shots) {
       if (t >= s.ts - 2.2 && t <= s.ts + 2.0) return 'goal'
       if (s.goal && t > s.ts + 2.0 && t < s.ts + 8) return 'celebrate'
@@ -1073,10 +1087,19 @@ export class Stadium {
         break
       }
       case 'celebrate': {
-        const a = t * 0.35
-        pos.set(fx + Math.cos(a) * 16, 6, fz + Math.sin(a) * 16)
-        look.set(fx, 1.2, fz)
-        fov = 40
+        // circle the scorer and the team-mates piling on him
+        const c = this.scorerAt ?? { x: fx, z: fz }
+        const a = t * 0.3
+        pos.set(c.x + Math.cos(a) * 12, 4.5, c.z + Math.sin(a) * 12)
+        look.set(c.x, 1.2, c.z)
+        fov = 36
+        break
+      }
+      case 'closeup': {
+        // low, from the side, close to the challenge
+        pos.set(ball.x - 6, 3.2, ball.z + 9)
+        look.set(ball.x, 0.8, ball.z)
+        fov = 36
         break
       }
       case 'follow': {

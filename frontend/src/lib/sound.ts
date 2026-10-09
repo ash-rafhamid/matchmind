@@ -148,6 +148,11 @@ export class Atmosphere {
     o.stop(t + 0.16)
   }
 
+  /** Lower the crowd while the commentator speaks. */
+  duck(on: boolean) {
+    this.master.gain.setTargetAtTime(on ? 0.45 : 1.0, this.ctx.currentTime, 0.25)
+  }
+
   /** Full time: three blasts. */
   fullTime() {
     this.whistle(false)

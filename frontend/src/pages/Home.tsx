@@ -4,7 +4,7 @@ import { CamCut, CameraSwitch, useCamCut } from '../components/Broadcast'
 import { formatClock, PlaybackClock, useClock } from '../lib/clock'
 import { scoreAt } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
-import { buildReel, ReelDirector, type ReelState } from '../lib/reel'
+import { buildTrailer, ReelDirector, type ReelState } from '../lib/reel'
 import { TrackingStore } from '../lib/tracking'
 import { momentTitle, onPrimary, stripTags } from '../lib/ui'
 import type { CameraMode } from '../scene/Stadium'
@@ -68,18 +68,21 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
 
   const [reel, setReel] = useState<ReelState | null>(null)
   const [replayDir, setReplayDir] = useState<1 | -1 | null>(null)
-  // the AI director tours every angle; any camera can be picked
+  // the AI director cuts every goal like a trailer; any camera can be picked
   const [cam, setCam] = useState<CameraMode>('director')
-  const { cut, onCut, pick } = useCamCut(setCam)
+  const { cut, onCut, pick, flash } = useCamCut(setCam)
 
   useEffect(() => {
     if (!clock || !pkg || !store) return
-    // the front page plays the match's highlights on a loop: build-ups at real speed, goals replayed
+    // the front page is a trailer on a loop: each goal built up live from several cameras, the celebration,
+    // then the goal again in slow motion from behind the net and from the side
     clock.waitFor = (time) => store.ready(time)
-    const director = new ReelDirector(clock, store, buildReel(pkg))
+    const director = new ReelDirector(clock, store, buildTrailer(pkg))
+    director.angles = ['goal', 'closeup']
     const unsub = director.subscribe((s) => {
       setReel(s)
       setReplayDir(s.phase === 'replay' && s.clip?.goal ? (s.clip.goal.team === 'home' ? 1 : -1) : null)
+      if (s.phase === 'cut') flash(s.cutTo === 'replay' ? 'replay' : 'live')
       if (s.phase === 'done') window.setTimeout(() => (clock.seek(0), director.start()), 1500)
     })
     director.onExit = () => director.start()
@@ -91,13 +94,13 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
       director.stop()
       clock.destroy()
     }
-  }, [clock, pkg, store])
+  }, [clock, pkg, store, flash])
 
   return (
     <section className="relative h-[calc(100vh-52px)] min-h-[560px] overflow-hidden bg-ink">
       {pkg && clock && store ? (
         <Suspense fallback={null}>
-          <Miniature pkg={pkg} store={store} clock={clock} mode={cam} tour={cam === 'director'} onCut={onCut} replay={replayDir} className="absolute inset-0" />
+          <Miniature pkg={pkg} store={store} clock={clock} mode={cam} tour={cam === 'director'} onCut={onCut} replay={replayDir} replayAngle={reel?.angle ?? 'goal'} className="absolute inset-0" />
         </Suspense>
       ) : (
         <div className="absolute inset-0 grid place-items-center">
