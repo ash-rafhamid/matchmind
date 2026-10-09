@@ -246,5 +246,6 @@
  "reel.chance": "Chance",
  "reel.second_half": "Zweite Halbzeit",
  "reel.fulltime": "Abpfiff",
- "reel.restart": "Neu starten"
+ "reel.restart": "Neu starten bei",
+ "reel.next": "Nächstes Highlight"
 }

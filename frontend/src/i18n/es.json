@@ -246,5 +246,6 @@
  "reel.chance": "Oportunidad",
  "reel.second_half": "Segunda parte",
  "reel.fulltime": "Final del partido",
- "reel.restart": "Reiniciar"
+ "reel.restart": "Reiniciar en",
+ "reel.next": "Siguiente jugada"
 }

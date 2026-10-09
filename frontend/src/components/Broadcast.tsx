@@ -218,17 +218,16 @@ export function Transport({ mode, onMode, onPlay, reel, sound, onSound }: Transp
   )
 }
 
-/** The cut from a dead-ball stretch to the restart. */
+/** While a dead-ball stretch fast-forwards: a small badge, the match keeps moving underneath. */
 export function RestartCut({ to }: { to: MatchEvent }) {
   const t = useT()
   return (
-    <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-      <div className="wipe absolute inset-0 bg-ink/80" />
-      <div className="absolute inset-0 grid place-items-center">
-        <div className="wipe flex items-stretch shadow-[0_12px_40px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.08s' }}>
-          <span className="cut-l flex items-center bg-volt ps-5 pe-3 xp text-[clamp(18px,3vw,30px)] text-ink tab-num">{to.clock}</span>
-          <span className="cut-r flex items-center bg-white pe-6 ps-3 xp text-[clamp(16px,2.5vw,26px)] text-ink">⏩ {t('reel.restart')}</span>
-        </div>
+    <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center sm:top-4">
+      <div className="fade-in flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+        <span className="cut-l flex items-center bg-ink ps-4 pe-3 cond text-volt">⏩ 10×</span>
+        <span className="cut-r flex items-center bg-white pe-5 ps-3 cond text-ink">
+          {t('reel.restart')} {to.clock}
+        </span>
       </div>
     </div>
   )
@@ -238,7 +237,6 @@ const CLIP_KEY: Record<string, string> = { kickoff: 'reel.kickoff', chance: 'ree
 
 /** What the edit shows between clips: a wipe with the next moment, or the REPLAY bug over a slow-motion replay. */
 export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull: () => void; onAgain: () => void }) {
-  const { pkg } = useMatch()
   const t = useT()
   if (reel.phase === 'replay')
     return (
@@ -252,20 +250,17 @@ export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull
   if (reel.phase === 'cut') {
     const isReplay = reel.cutTo === 'replay'
     const c = isReplay ? reel.clip : reel.next
-    const team = c?.team ? pkg.meta.teams[c.team] : null
+    // never give away what is coming (no "GOAL" before the goal): just the minute and "next highlight"
     let label = ''
     if (isReplay) label = t('reel.replay')
-    else if (c) label = c.kind === 'kickoff' && c.start > 60 ? t('reel.second_half') : CLIP_KEY[c.kind] ? t(CLIP_KEY[c.kind]) : t(`kicker.${c.kind}`)
+    else if (c) label = c.kind === 'kickoff' && c.start > 60 ? t('reel.second_half') : c.kind === 'fulltime' ? t(CLIP_KEY.fulltime) : t('reel.next')
     return (
       <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
         <div className="wipe absolute inset-0 bg-ink/85" />
         <div className="absolute inset-0 grid place-items-center">
           <div className="wipe flex items-stretch shadow-[0_12px_40px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }}>
             <span className="cut-l flex items-center bg-volt ps-6 pe-4 xp text-[clamp(22px,4vw,44px)] text-ink tab-num">{isReplay ? '↺' : c?.clock}</span>
-            <span
-              className="cut-r flex items-center pe-7 ps-4 xp text-[clamp(18px,3vw,34px)]"
-              style={team ? { background: team.primary, color: onPrimary(team) } : { background: '#fff', color: '#0b0c0e' }}
-            >
+            <span className="cut-r flex items-center bg-white pe-7 ps-4 xp text-[clamp(18px,3vw,34px)] text-ink">
               {label}
             </span>
           </div>

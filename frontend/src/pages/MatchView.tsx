@@ -66,7 +66,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 
   // highlights by default: the AI director cuts the match like TV, with goal replays
   const director = useMemo(() => new ReelDirector(clock, store, buildReel(pkg)), [clock, store, pkg])
-  const [mode, setModeState] = useState<PlayMode>('highlights')
+  const [mode, setModeState] = useState<PlayMode>('full')
   const [reel, setReel] = useState<ReelState>(() => director.state())
   // sound is on by default; browsers only allow it to start from a click, so it starts with Play
   const [sound, setSoundState] = useState(() => {
@@ -117,23 +117,27 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   }
   useEffect(() => {
     if (mode !== 'full') return
-    let busy = false
-    return clock.subscribe(() => {
-      if (busy || !clock.playing) return
+    // dead ball: keep playing, just faster, until shortly before the restart - no freeze, no jump
+    let base: number | null = null
+    const off = clock.subscribe(() => {
       const t = clock.time
-      const s = skips.find((k) => t >= k.from && t < k.to)
-      if (!s) return
-      busy = true
-      clock.pause()
-      store.prefetch(s.to)
-      setCutTo(s.restart)
-      window.setTimeout(() => {
-        clock.seek(s.to)
-        clock.play()
+      const s = clock.playing ? skips.find((k) => t >= k.from && t < k.to) : undefined
+      if (s && base === null) {
+        base = clock.speed
+        store.prefetch(s.to)
+        clock.setSpeed(Math.max(base, 10))
+        setCutTo(s.restart)
+      } else if (!s && base !== null) {
+        const restore = base
+        base = null
+        clock.setSpeed(restore)
         setCutTo(null)
-        busy = false
-      }, 650)
+      }
     })
+    return () => {
+      off()
+      if (base !== null) clock.setSpeed(base)
+    }
   }, [mode, clock, skips, store])
 
   const onPlay = () => {
@@ -202,7 +206,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               </div>
             </div>
             {goal && <GoalTakeover key={goal.id} goal={goal} />}
-            {cutTo && <RestartCut key={cutTo.id} to={cutTo} />}
+            {cutTo && <RestartCut to={cutTo} />}
             {mode === 'highlights' && (
               <ReelOverlay
                 reel={reel}

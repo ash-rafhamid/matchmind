@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../lib/settings'
 import { speak, speechAvailable, stopSpeaking } from '../lib/speech'
-import { onPrimary } from '../lib/ui'
+import { onPrimary, stripTags } from '../lib/ui'
 
 /**
  * Broadcast graphics for studios and streamers: a 1920x1080 layer driven by the live
@@ -40,7 +40,6 @@ function params(): URLSearchParams {
   return new URLSearchParams(window.location.hash.split('?')[1] ?? '')
 }
 
-const strip = (s: string) => s.replace(/\s*\[#\d+\]/g, '').replace(/\s+/g, ' ').trim()
 
 export default function Studio({ matchId }: { matchId: string }) {
   const settings = useSettings()
@@ -106,7 +105,7 @@ export default function Studio({ matchId }: { matchId: string }) {
     })
     es.addEventListener('story', (e) => {
       const s = JSON.parse((e as MessageEvent).data)
-      setLower((l) => (l && l.id === s.moment_id ? { ...l, text: strip(s.text), verified: s.verdict?.passed, numbers: s.verdict?.checked_numbers } : l))
+      setLower((l) => (l && l.id === s.moment_id ? { ...l, text: stripTags(s.text), verified: s.verdict?.passed, numbers: s.verdict?.checked_numbers } : l))
       if (voiceRef.current) speak(s.text, lang)
     })
     es.addEventListener('end', () => {
