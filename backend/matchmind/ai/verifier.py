@@ -17,6 +17,7 @@ CLOCK = re.compile(r"\b(\d{1,3})(?:\+(\d{1,2}))?['’′]")
 FORMATION = re.compile(r"(?<![\d.,])\d-\d-\d(?:-\d)?(?![\d.,]\d)")
 SCORELINE = re.compile(r"(?<![\d.,])(\d{1,2})\s?[-–]\s?(\d{1,2})(?![\d.,]\d)")
 SCORE_STRING = re.compile(r"^(\d{1,2})-(\d{1,2})$")
+CLUB = re.compile(r"\b(?:[A-Z][a-z]+ ){1,2}(?:City|Town|United|Rovers|Athletic|Albion|FC|Wanderers|County|Rangers)\b")
 ALWAYS_OK = {0.0, 1.0, 2.0, 3.0, 10.0, 11.0, 45.0, 90.0, 100.0}  # one-two, 3 points, "4 in 10", 11 v 11, halves
 
 MULTI_TAG = re.compile(r"\[\s*#?(\d+)(?:\s*[,;]\s*#?\d+)+\s*\]")
@@ -134,6 +135,13 @@ def verify(text: str, packet: dict, roster: dict[str, str], allowed_event_ids: s
         checked += 1
         if not _supported(value, numbers):
             issues.append(f"number {m.group(0).strip()} is not in the facts")
+
+    # Club names must be ones the facts mention (catches invented or misspelled teams).
+    known_clubs = {m.group(0) for s in strings for m in CLUB.finditer(s)}
+    for m in CLUB.finditer(text):
+        name = m.group(0)
+        if not any(name == k or name.endswith(k) for k in known_clubs):
+            issues.append(f"team {name} is not in these facts")
 
     # Any player who is named must be in the packet.
     roster_names = set(roster.values())

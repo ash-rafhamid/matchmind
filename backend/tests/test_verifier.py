@@ -68,3 +68,11 @@ def test_scorelines_must_match_a_real_score() -> None:
     formation = pkg["meta"]["teams"]["home"]["dna"]["formation"]
     assert verify(f"They set up in a {formation}.", packet, store.LEAGUE_ROSTER).passed
     assert not verify("They set up in a 4-1-4-1.", packet, store.LEAGUE_ROSTER).passed
+
+
+def test_team_names_must_be_real() -> None:
+    pkg = store.load(MATCHES[0])
+    packet = moment_packet(pkg, pkg["analytics"]["moments"][0])
+    home = pkg["meta"]["teams"]["home"]["name"]
+    assert verify(f"{home} were on top.", packet, store.LEAGUE_ROSTER).passed
+    assert not verify("Hartcliffe City were on top.", packet, store.LEAGUE_ROSTER).passed
