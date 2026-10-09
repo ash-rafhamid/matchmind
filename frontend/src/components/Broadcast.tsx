@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { formatClock, useClock } from '../lib/clock'
 import { lastEventIndex, scoreAt, useMatch } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
 import { momentTitle, onPrimary, surname } from '../lib/ui'
+import type { ReelState } from '../lib/reel'
+import { Atmosphere } from '../lib/sound'
+import type { TrackingStore } from '../lib/tracking'
 import type { CameraMode } from '../scene/Stadium'
 import type { CrewResult, MatchEvent, Moment } from '../types'
 import StoryText from './StoryText'
@@ -143,43 +146,67 @@ export function GoalTakeover({ goal }: { goal: MatchEvent }) {
   )
 }
 
-const SPEEDS = [1, 4, 8, 16, 32]
 const ACTION = new Set(['pass', 'carry', 'shot', 'interception', 'tackle', 'save', 'clearance', 'block', 'foul', 'card', 'offside', 'goal'])
 
-/** Bottom bar of the stage: play, speed, the match timeline, and what is happening right now. */
-export function Transport() {
+export type PlayMode = 'highlights' | 'full'
+
+interface TransportProps {
+  mode: PlayMode
+  onMode: (m: PlayMode) => void
+  onPlay: () => void
+  reel: ReelState
+  sound: boolean
+  onSound: () => void
+}
+
+/** Bottom bar of the stage: highlights or the full match, play, speed, sound, the timeline, and what is happening now. */
+export function Transport({ mode, onMode, onPlay, reel, sound, onSound }: TransportProps) {
   const { pkg, clock, name } = useMatch()
   const { time, playing, speed } = useClock(clock, 6)
   const t = useT()
   const shown = useMemo(() => pkg.events.filter((e) => ACTION.has(e.type)), [pkg.events])
   const idx = lastEventIndex(shown, time)
   const cur = idx >= 0 && time - shown[idx].ts < 3 ? shown[idx] : null
+  const speeds = mode === 'highlights' ? [1, 2] : [1, 2, 4, 8, 16]
+  const running = playing || reel.phase === 'cut'
 
   return (
     <div className="plate">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 pt-2.5 sm:px-4">
-        <button className="btn btn-volt !px-5 !py-2" onClick={() => clock.toggle()} aria-label={playing ? t('match.pause') : t('match.play')}>
-          {playing ? '❚❚' : '▶'} <span>{playing ? t('match.pause') : t('match.play')}</span>
+        <button className="btn btn-volt min-w-[112px] !px-5 !py-2" onClick={onPlay} aria-label={running ? t('match.pause') : t('match.play')}>
+          {running ? '❚❚' : '▶'} <span>{running ? t('match.pause') : t('match.play')}</span>
         </button>
-        <button className="act" onClick={() => clock.seek(0)}>
-          {t('match.kickoff')}
-        </button>
-        <div className="seg" role="group" aria-label="Playback speed">
-          {SPEEDS.map((s) => (
-            <button key={s} aria-pressed={speed === s} onClick={() => clock.setSpeed(s)} className="tab-num">
+        <div className="seg" role="group" aria-label={t('mode.help')} title={t('mode.help')}>
+          <button aria-pressed={mode === 'highlights'} onClick={() => onMode('highlights')}>
+            {t('mode.highlights')}
+          </button>
+          <button aria-pressed={mode === 'full'} onClick={() => onMode('full')}>
+            {t('mode.full')}
+          </button>
+        </div>
+        <div className="seg" role="group" aria-label="Speed">
+          {speeds.map((s) => (
+            <button key={s} aria-pressed={Math.abs(speed - s) < 0.01} onClick={() => clock.setSpeed(s)} className="tab-num">
               {s}×
             </button>
           ))}
         </div>
+        <button className={`act ${sound ? '!text-ink' : ''}`} onClick={onSound} aria-pressed={sound}>
+          {sound ? '🔊' : '🔈'} {sound ? t('sound.on') : t('sound.off')}
+        </button>
         <div className="ms-auto flex min-h-[22px] items-center gap-2 text-[13px]">
-          {cur && (
+          {clock.buffering ? (
+            <span className="working cond text-ink-3">{t('buffering')}</span>
+          ) : mode === 'highlights' && reel.clip && reel.phase !== 'off' ? (
+            <span className="cond text-ink-3">{t('reel.clip', { n: reel.index + 1, total: reel.total })}</span>
+          ) : null}
+          {cur && !clock.buffering && (
             <>
               <span className="cond text-ink-3">{t(`act.${cur.type}`)}</span>
               <span className="font-semibold">
                 {surname(name(cur.player))}
                 {cur.receiver ? ` → ${surname(name(cur.receiver))}` : ''}
               </span>
-              {cur.outcome && !['complete', 'success'].includes(cur.outcome) && <span className="text-ink-3">({cur.outcome.replace('_', ' ')})</span>}
             </>
           )}
         </div>
@@ -189,4 +216,100 @@ export function Transport() {
       </div>
     </div>
   )
+}
+
+const CLIP_KEY: Record<string, string> = { kickoff: 'reel.kickoff', chance: 'reel.chance', fulltime: 'reel.fulltime' }
+
+/** What the edit shows between clips: a wipe with the next moment, or the REPLAY bug over a slow-motion replay. */
+export function ReelOverlay({ reel, onFull, onAgain }: { reel: ReelState; onFull: () => void; onAgain: () => void }) {
+  const { pkg } = useMatch()
+  const t = useT()
+  if (reel.phase === 'replay')
+    return (
+      <div className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center sm:top-4">
+        <div className="wipe flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+          <span className="cut-l flex items-center bg-flare ps-5 pe-3 xp text-[18px] text-white">{t('reel.replay')}</span>
+          <span className="cut-r flex items-center bg-ink pe-5 ps-3 cond text-volt">{t('reel.slowmo')} · 0.4×</span>
+        </div>
+      </div>
+    )
+  if (reel.phase === 'cut') {
+    const isReplay = reel.cutTo === 'replay'
+    const c = isReplay ? reel.clip : reel.next
+    const team = c?.team ? pkg.meta.teams[c.team] : null
+    let label = ''
+    if (isReplay) label = t('reel.replay')
+    else if (c) label = c.kind === 'kickoff' && c.start > 60 ? t('reel.second_half') : CLIP_KEY[c.kind] ? t(CLIP_KEY[c.kind]) : t(`kicker.${c.kind}`)
+    return (
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+        <div className="wipe absolute inset-0 bg-ink/85" />
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="wipe flex items-stretch shadow-[0_12px_40px_rgba(0,0,0,0.5)]" style={{ animationDelay: '0.1s' }}>
+            <span className="cut-l flex items-center bg-volt ps-6 pe-4 xp text-[clamp(22px,4vw,44px)] text-ink tab-num">{isReplay ? '↺' : c?.clock}</span>
+            <span
+              className="cut-r flex items-center pe-7 ps-4 xp text-[clamp(18px,3vw,34px)]"
+              style={team ? { background: team.primary, color: onPrimary(team) } : { background: '#fff', color: '#0b0c0e' }}
+            >
+              {label}
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (reel.phase === 'done')
+    return (
+      <div className="absolute inset-0 z-20 grid place-items-center bg-ink/70">
+        <div className="wipe-up text-center text-white">
+          <div className="xp text-[clamp(28px,5vw,56px)]">{t('reel.done')}</div>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <button onClick={onFull} className="btn btn-volt">
+              {t('reel.watchFull')} →
+            </button>
+            <button onClick={onAgain} className="btn">
+              ↺ {t('reel.again')}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  return null
+}
+
+/** Stadium sound, driven by the match: tension from where the ball is, reactions to shots, goals and whistles. */
+export function useAtmosphere(on: boolean, store: TrackingStore, replaying: { current: boolean }) {
+  const { pkg, clock } = useMatch()
+  const atm = useRef<Atmosphere | null>(null)
+  const events = useMemo(() => pkg.events.filter((e) => ['shot', 'goal', 'period_start', 'period_end', 'card', 'foul'].includes(e.type)), [pkg.events])
+
+  useEffect(() => {
+    if (!on) return
+    const a = new Atmosphere()
+    atm.current = a
+    const timer = window.setInterval(() => {
+      const b = store.ballAt(clock.time)
+      if (b) a.setTension(Math.max(0, (Math.abs(b[0] - 52.5) - 20) / 32))
+    }, 300)
+    return () => {
+      clearInterval(timer)
+      a.close()
+      atm.current = null
+    }
+  }, [on, clock, store])
+
+  const onCross = useCallback(
+    (e: MatchEvent | Moment) => {
+      const a = atm.current
+      const ev = e as MatchEvent
+      if (!a) return
+      if (ev.type === 'shot') {
+        a.thud(0.9)
+        if (ev.outcome !== 'goal') a.swell(0.25 + Math.min(0.5, (ev.xg ?? 0) * 1.4), 2.2)
+      } else if (ev.type === 'goal') a.swell(replaying.current ? 0.45 : 1, replaying.current ? 3 : 7)
+      else if (ev.type === 'period_start' || ev.type === 'period_end') a.whistle(true)
+      else if (ev.type === 'card' || ev.type === 'foul') a.whistle(false)
+    },
+    [replaying],
+  )
+  useCrossings(events, onCross)
 }

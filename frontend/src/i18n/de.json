@@ -229,5 +229,21 @@
  "title.save": "Starke Parade von {player}",
  "title.red_card": "Rote Karte - {player}",
  "title.tactical_change": "{team} ändert Taktik",
- "title.momentum": "{team} übernehmen das Kommando"
+ "title.momentum": "{team} übernehmen das Kommando",
+ "mode.highlights": "Highlights",
+ "mode.full": "Volles Spiel",
+ "mode.help": "Highlights: jeder große Moment in Echtzeit, mit Wiederholungen",
+ "sound.on": "Stadion-Sound an",
+ "sound.off": "Stadion-Sound aus",
+ "buffering": "Lade die nächsten Momente",
+ "reel.replay": "Wiederholung",
+ "reel.slowmo": "Zeitlupe",
+ "reel.clip": "Clip {n} von {total}",
+ "reel.done": "Das waren die Highlights.",
+ "reel.watchFull": "Volles Spiel ansehen",
+ "reel.again": "Highlights nochmal abspielen",
+ "reel.kickoff": "Anpfiff",
+ "reel.chance": "Chance",
+ "reel.second_half": "Zweite Halbzeit",
+ "reel.fulltime": "Abpfiff"
 }

@@ -229,5 +229,21 @@
  "title.save": "शानदार बचाव - {player}",
  "title.red_card": "रेड कार्ड - {player}",
  "title.tactical_change": "{team} ने रणनीति बदली",
- "title.momentum": "{team} ने कब्ज़ा किया"
+ "title.momentum": "{team} ने कब्ज़ा किया",
+ "mode.highlights": "हाइलाइट्स",
+ "mode.full": "पूरा मैच",
+ "mode.help": "हाइलाइट्स: हर बड़ा पल असली रफ्तार में, रिप्ले के साथ",
+ "sound.on": "स्टेडियम की आवाज़ चालू",
+ "sound.off": "स्टेडियम की आवाज़",
+ "buffering": "अगले पलों को लोड किया जा रहा है",
+ "reel.replay": "रिप्ले",
+ "reel.slowmo": "धीमी गति",
+ "reel.clip": "क्लिप {n} में से {total}",
+ "reel.done": "यही हाइलाइट्स हैं।",
+ "reel.watchFull": "पूरा मैच देखें",
+ "reel.again": "हाइलाइट्स फिर से चलाएं",
+ "reel.kickoff": "किक-ऑफ",
+ "reel.chance": "चांस",
+ "reel.second_half": "दूसरा हाफ",
+ "reel.fulltime": "फुल टाइम"
 }

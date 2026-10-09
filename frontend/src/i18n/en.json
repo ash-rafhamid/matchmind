@@ -229,5 +229,21 @@
  "title.save": "Fine save by {player}",
  "title.red_card": "Red card - {player}",
  "title.tactical_change": "{team} change approach",
- "title.momentum": "{team} take control"
+ "title.momentum": "{team} take control",
+ "mode.highlights": "Highlights",
+ "mode.full": "Full match",
+ "mode.help": "Highlights: every big moment at real speed, with replays",
+ "sound.on": "Stadium sound on",
+ "sound.off": "Stadium sound",
+ "buffering": "Loading the next moments",
+ "reel.replay": "Replay",
+ "reel.slowmo": "slow motion",
+ "reel.clip": "Clip {n} of {total}",
+ "reel.done": "That's the highlights.",
+ "reel.watchFull": "Watch the full match",
+ "reel.again": "Play the highlights again",
+ "reel.kickoff": "Kick-off",
+ "reel.chance": "Chance",
+ "reel.second_half": "Second half",
+ "reel.fulltime": "Full time"
 }

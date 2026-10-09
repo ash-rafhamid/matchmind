@@ -38,6 +38,7 @@ const toX = (x: number) => x - L / 2
 const toZ = (y: number) => y - W / 2
 
 interface Body {
+  side: Side
   x: number
   z: number
   heading: number
@@ -121,6 +122,7 @@ export class Stadium {
   private shots: Shot[]
 
   private mode: CameraMode = 'director'
+  private override: { shot: 'replay'; dir: 1 | -1 } | null = null
   private camPos = new THREE.Vector3()
   private camLook = new THREE.Vector3()
   private focus = new THREE.Vector3()
@@ -203,6 +205,12 @@ export class Stadium {
 
   setMode(mode: CameraMode) {
     this.mode = mode
+    this.idleFrames = 0
+  }
+
+  /** Take the camera for a replay (low, behind the goal being scored in), or give it back. */
+  setReplay(dir: 1 | -1 | null) {
+    this.override = dir ? { shot: 'replay', dir } : null
     this.idleFrames = 0
   }
 
@@ -526,7 +534,7 @@ export class Stadium {
         set('arms', k, skin)
         set('sleeves', k, shirt)
       }
-      this.bodies.push({ x: 0, z: 0, heading: side === 'home' ? Math.PI / 2 : -Math.PI / 2, phase: (h % 100) / 16, amp: 0, speed: 0, has: false })
+      this.bodies.push({ side, x: 0, z: 0, heading: side === 'home' ? Math.PI / 2 : -Math.PI / 2, phase: (h % 100) / 16, amp: 0, speed: 0, has: false })
     })
     for (const part of Object.values(this.parts)) {
       for (let k = 0; k < part.mesh.count; k++) part.mesh.setMatrixAt(k, ZERO)
@@ -666,9 +674,16 @@ export class Stadium {
       b.z = z
       b.has = true
 
-      const swing = Math.sin(b.phase) * 0.75 * b.amp
-      const bob = Math.abs(Math.cos(b.phase)) * 0.05 * b.amp
-      const lean = 0.16 * Math.min(1, b.speed / 8)
+      let swing = Math.sin(b.phase) * 0.75 * b.amp
+      let bob = Math.abs(Math.cos(b.phase)) * 0.05 * b.amp
+      const party = this.cheer !== null && this.cheer.side === b.side && t < this.cheer.until
+      const wave = performance.now() / 1000
+      if (party) {
+        // the scoring side celebrates: arms up, jumping
+        bob = Math.abs(Math.sin(wave * 7 + i)) * 0.22
+        swing *= 0.3
+      }
+      const lean = party ? 0 : 0.16 * Math.min(1, b.speed / 8)
       tmpQ.setFromAxisAngle(UP, b.heading)
       tmpB.compose(tmpV.set(x, bob * FIG, z), tmpQ, tmpS.setScalar(FIG))
       tmpB.multiply(tmpM.makeRotationX(lean))
@@ -684,8 +699,8 @@ export class Stadium {
       P.hair.mesh.setMatrixAt(i, head)
       const legL = at(-0.11, 0.88, swing)
       const legR = at(0.11, 0.88, -swing)
-      const armL = at(-0.3, 1.52, -swing * 0.8)
-      const armR = at(0.3, 1.52, swing * 0.8)
+      const armL = at(-0.3, 1.52, party ? -2.75 + 0.25 * Math.sin(wave * 9 + i) : -swing * 0.8)
+      const armR = at(0.3, 1.52, party ? -2.75 + 0.25 * Math.cos(wave * 9 + i) : swing * 0.8)
       for (const part of ['legs', 'socks', 'boots'] as const) {
         P[part].mesh.setMatrixAt(2 * i, legL)
         P[part].mesh.setMatrixAt(2 * i + 1, legR)
@@ -806,7 +821,7 @@ export class Stadium {
     this.focus.z += (ball.z - this.focus.z) * kf
     const fx = this.focus.x
     const fz = this.focus.z
-    const shot = this.mode === 'director' ? this.directorShot(t) : this.mode
+    const shot = this.override ? this.override.shot : this.mode === 'director' ? this.directorShot(t) : this.mode
     const cut = shot !== this.lastCut
     this.lastCut = shot
 
@@ -825,6 +840,13 @@ export class Stadium {
         pos.set(dir * (L / 2 + 34), 17, fz * 0.25 + 8)
         look.set(dir * (L / 2 - 14), 0, fz * 0.6)
         fov = 26
+        break
+      }
+      case 'replay': {
+        const dir = this.override?.dir ?? 1
+        pos.set(dir * (L / 2 + 16), 6.5, ball.z * 0.4 + 5)
+        look.set(ball.x, 1, ball.z)
+        fov = 34
         break
       }
       case 'celebrate': {

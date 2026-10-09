@@ -229,5 +229,21 @@
  "title.save": "{player}の好セーブ",
  "title.red_card": "レッドカード - {player}",
  "title.tactical_change": "{team} 戦術変更",
- "title.momentum": "{team} 主導権握る"
+ "title.momentum": "{team} 主導権握る",
+ "mode.highlights": "ハイライト",
+ "mode.full": "フルマッチ",
+ "mode.help": "ハイライト：リアルスピードで大事な場面を、リプレイ付きで",
+ "sound.on": "スタジアム音声オン",
+ "sound.off": "スタジアム音声オフ",
+ "buffering": "次の場面を読み込み中",
+ "reel.replay": "リプレイ",
+ "reel.slowmo": "スローモーション",
+ "reel.clip": "クリップ {n} / {total}",
+ "reel.done": "これがハイライトです。",
+ "reel.watchFull": "フルマッチを見る",
+ "reel.again": "ハイライトをもう一度再生",
+ "reel.kickoff": "キックオフ",
+ "reel.chance": "チャンス",
+ "reel.second_half": "後半",
+ "reel.fulltime": "試合終了"
 }

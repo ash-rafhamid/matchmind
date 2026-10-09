@@ -229,5 +229,21 @@
  "title.save": "Boa defesa de {player}",
  "title.red_card": "Cartão vermelho - {player}",
  "title.tactical_change": "{team} muda a abordagem",
- "title.momentum": "{team} assume o controlo"
+ "title.momentum": "{team} assume o controlo",
+ "mode.highlights": "Destaques",
+ "mode.full": "Jogo completo",
+ "mode.help": "Destaques: todos os grandes momentos em velocidade real, com repetições",
+ "sound.on": "Som do estádio ligado",
+ "sound.off": "Som do estádio",
+ "buffering": "Carregando os próximos momentos",
+ "reel.replay": "Repetição",
+ "reel.slowmo": "câmera lenta",
+ "reel.clip": "Clipe {n} de {total}",
+ "reel.done": "Esses são os destaques.",
+ "reel.watchFull": "Ver o jogo completo",
+ "reel.again": "Rever os destaques",
+ "reel.kickoff": "Início",
+ "reel.chance": "Chance",
+ "reel.second_half": "Segundo tempo",
+ "reel.fulltime": "Fim de jogo"
 }

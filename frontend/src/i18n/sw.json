@@ -229,5 +229,21 @@
  "title.save": "Kutoa salama nzuri na {player}",
  "title.red_card": "Kadi nyekundu - {player}",
  "title.tactical_change": "{team} wabadilisha mkakati",
- "title.momentum": "{team} wanachukua udhibiti"
+ "title.momentum": "{team} wanachukua udhibiti",
+ "mode.highlights": "Mambo kuu",
+ "mode.full": "Mechi kamili",
+ "mode.help": "Mambo kuu: kila tukio kubwa kwa kasi halisi, na marudio",
+ "sound.on": "Sauti ya uwanja imewashwa",
+ "sound.off": "Sauti ya uwanja",
+ "buffering": "Inapakia matukio yajayo",
+ "reel.replay": "Rudia",
+ "reel.slowmo": "polepole",
+ "reel.clip": "Kipande {n} cha {total}",
+ "reel.done": "Hayo ndio mambo kuu.",
+ "reel.watchFull": "Tazama mechi kamili",
+ "reel.again": "Cheza mambo kuu tena",
+ "reel.kickoff": "Anzisha",
+ "reel.chance": "Fursa",
+ "reel.second_half": "Nusu ya pili",
+ "reel.fulltime": "Muda umeisha"
 }
