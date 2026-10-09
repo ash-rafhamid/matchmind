@@ -25,6 +25,8 @@ export interface TrackingChunk {
   teams: string[]
   xy: number[]
   ball: number[]
+  ball_z?: number[]
+  on_ball?: number[]
   scale: number
 }
 

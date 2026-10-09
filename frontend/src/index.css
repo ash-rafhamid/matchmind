@@ -1,80 +1,440 @@
 @import "tailwindcss";
 
+/*
+ * MatchMind - "matchday programme" design system.
+ * Paper and ink, one vermilion signal colour, hairline rules, square corners.
+ * Serif for words, condensed capitals for labels, monospace for every number.
+ */
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Barlow Condensed", "Inter", sans-serif;
-  --color-ink-950: #070b16;
-  --color-ink-900: #0b1020;
-  --color-ink-850: #0f1629;
-  --color-ink-800: #131c33;
-  --color-ink-700: #1c2846;
-  --color-ink-600: #2a3a63;
-  --color-ink-400: #7f90b8;
-  --color-ink-300: #a9b6d6;
-  --color-ink-100: #e7ecfb;
-  --color-mint-400: #2ee6a6;
-  --color-mint-500: #14c98a;
-  --color-sky-400: #7dd3fc;
-  --color-amber-400: #fbbf24;
-  --color-rose-400: #fb7185;
+  --font-serif: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-cond: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SFMono-Regular", monospace;
+  --font-sans: var(--font-serif);
+
+  --color-paper: #f2eee3;
+  --color-paper-2: #ebe5d6;
+  --color-paper-3: #e1d9c6;
+  --color-ink: #141310;
+  --color-ink-2: #3b3830;
+  --color-ink-3: #77705f;
+  --color-ink-4: #a49c88;
+  --color-rule: #14131024;
+  --color-signal: #e3361b;
+  --color-signal-2: #b8270f;
+  --color-proof: #1d6a46;
 }
 
+:root {
+  color-scheme: light;
+  --grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08  0 0 0 0 0.07  0 0 0 0 0.05  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+@layer base {
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {
-  background: radial-gradient(1200px 600px at 10% -10%, #15224a 0%, transparent 60%),
-    radial-gradient(900px 500px at 110% 10%, #0e3b3a 0%, transparent 55%), var(--color-ink-950);
-  color: var(--color-ink-100);
-  font-family: var(--font-sans);
+  margin: 0;
+  background-color: var(--color-paper);
+  background-image: var(--grain);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  font-size: 16px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.panel {
-  background: color-mix(in srgb, var(--color-ink-850) 88%, transparent);
-  border: 1px solid var(--color-ink-700);
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
+::selection {
+  background: var(--color-signal);
+  color: var(--color-paper);
 }
 
-.chip-evidence {
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+}
+
+}
+
+@layer components {
+/* ---------------------------------------------------------------- type */
+
+.label {
+  font-family: var(--font-cond);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+}
+
+.label-ink {
+  color: var(--color-ink);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero" 0;
+}
+
+.display {
+  font-family: var(--font-serif);
+  font-variation-settings: "SOFT" 30, "WONK" 0;
+  letter-spacing: -0.02em;
+}
+
+.italic-wonk {
+  font-style: italic;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+}
+
+.body-copy {
+  font-size: 16px;
+  line-height: 1.62;
+  font-variation-settings: "SOFT" 50;
+  color: var(--color-ink-2);
+}
+
+.dropcap::first-letter {
+  float: left;
+  font-size: 3.6em;
+  line-height: 0.82;
+  padding: 0.06em 0.08em 0 0;
+  font-weight: 600;
+  color: var(--color-ink);
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+}
+
+/* ---------------------------------------------------------------- rules & frames */
+
+.rule {
+  border-color: var(--color-rule);
+}
+
+.double-rule {
+  border-top: 3px double var(--color-ink);
+}
+
+.hair {
+  border: 1px solid var(--color-ink);
+}
+
+/* Printer's crop marks around a figure. */
+.plate {
+  position: relative;
+  padding: 14px;
+}
+
+.plate::before,
+.plate::after,
+.plate > .crop-b::before,
+.plate > .crop-b::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--color-ink);
+  border-style: solid;
+  pointer-events: none;
+}
+
+.plate::before {
+  top: 0;
+  left: 0;
+  border-width: 1px 0 0 1px;
+}
+
+.plate::after {
+  top: 0;
+  right: 0;
+  border-width: 1px 1px 0 0;
+}
+
+.plate > .crop-b::before {
+  bottom: 0;
+  left: 0;
+  border-width: 0 0 1px 1px;
+}
+
+.plate > .crop-b::after {
+  bottom: 0;
+  right: 0;
+  border-width: 0 1px 1px 0;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.btn {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 0 6px;
-  margin: 0 2px;
-  border-radius: 999px;
-  font-size: 11px;
+  gap: 0.5em;
+  font-family: var(--font-cond);
   font-weight: 600;
-  line-height: 18px;
-  color: var(--color-ink-950);
-  background: var(--color-sky-400);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  border: 1px solid var(--color-ink);
+  background: transparent;
+  color: var(--color-ink);
   cursor: pointer;
-  vertical-align: 1px;
-  transition: transform 0.12s ease, background 0.12s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.chip-evidence:hover {
-  background: var(--color-mint-400);
-  transform: translateY(-1px);
+.btn:hover:not(:disabled) {
+  background: var(--color-ink);
+  color: var(--color-paper);
 }
 
-.scroll-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-ink-600) transparent;
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
-input[type='range'] {
-  accent-color: var(--color-mint-400);
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-solid {
+  background: var(--color-ink);
+  color: var(--color-paper);
+}
+
+.btn-solid:hover:not(:disabled) {
+  background: var(--color-signal);
+  border-color: var(--color-signal);
+}
+
+.link {
+  font-family: var(--font-cond);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-2);
+  text-decoration: underline;
+  text-decoration-color: var(--color-ink-4);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.link:hover {
+  color: var(--color-signal);
+  text-decoration-color: var(--color-signal);
+}
+
+/* Inline "sentence" selects: Reading as [a casual fan] in [English]. */
+.inline-select {
+  appearance: none;
+  font: inherit;
+  font-style: italic;
+  font-variation-settings: "SOFT" 100, "WONK" 1;
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--color-signal);
+  padding: 0 1.1em 0 0.1em;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-signal) 50%),
+    linear-gradient(135deg, var(--color-signal) 50%, transparent 50%);
+  background-position: calc(100% - 7px) 55%, calc(100% - 3px) 55%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.inline-select option {
+  font-style: normal;
+  background: var(--color-paper);
+}
+
+.inline-input {
+  font: inherit;
+  width: 3.2em;
+  text-align: center;
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid var(--color-signal);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+}
+
+.field {
+  width: 100%;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--color-ink);
+  padding: 10px 2px;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.field::placeholder {
+  color: var(--color-ink-4);
+  font-style: italic;
+}
+
+.field:focus {
+  border-bottom-color: var(--color-signal);
+}
+
+/* Range: a hairline track with a square ink thumb. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--color-ink);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 1px;
+  background: var(--color-ink);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -6px;
+  background: var(--color-ink);
+  border: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 0;
+  background: var(--color-ink);
+  border: 0;
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  background: var(--color-signal);
+  transform: rotate(45deg);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--color-ink);
+}
+
+/* ---------------------------------------------------------------- tabs */
+
+.tab {
+  font-family: var(--font-cond);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-3);
+  padding: 10px 0 8px;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab:hover {
+  color: var(--color-ink);
+}
+
+.tab[aria-selected="true"] {
+  color: var(--color-ink);
+  border-bottom-color: var(--color-signal);
+}
+
+.tab .roman {
+  font-family: var(--font-serif);
+  font-style: italic;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-right: 6px;
+  color: var(--color-signal);
+}
+
+/* ---------------------------------------------------------------- evidence footnotes */
+
+.footnote {
+  display: inline;
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  font-weight: 600;
+  vertical-align: super;
+  line-height: 0;
+  color: var(--color-signal);
+  background: none;
+  border: 0;
+  padding: 0 1px;
+  margin: 0 1px;
+  cursor: pointer;
+  border-bottom: 1px dotted var(--color-signal);
+}
+
+.footnote:hover {
+  color: var(--color-paper);
+  background: var(--color-signal);
+  border-bottom-color: transparent;
+}
+
+/* ---------------------------------------------------------------- stamps */
+
+.stamp {
+  display: inline-block;
+  font-family: var(--font-cond);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 2.5px solid currentColor;
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+  transform: rotate(-4deg);
+  mix-blend-mode: multiply;
+  opacity: 0.92;
+}
+
+.stamp-in {
+  animation: stamp-in 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: rotate(-4deg) scale(1.8);
+  }
+  to {
+    opacity: 0.92;
+    transform: rotate(-4deg) scale(1);
+  }
+}
+
+/* ---------------------------------------------------------------- motion */
+
+.rise {
+  animation: rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -82,20 +442,76 @@ input[type='range'] {
   }
 }
 
-.animate-rise {
-  animation: rise 0.35s ease both;
+.ink-in {
+  animation: ink-in 0.6s ease both;
 }
 
-@keyframes pulse-dot {
+@keyframes ink-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: none;
+  }
+}
+
+.live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-signal);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
   0%,
   100% {
     opacity: 1;
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.25;
   }
 }
 
-.live-dot {
-  animation: pulse-dot 1.4s ease-in-out infinite;
+/* "The crew is writing" - three dots being typed. */
+.typing::after {
+  content: "";
+  display: inline-block;
+  width: 1.4em;
+  text-align: left;
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0% {
+    content: "";
+  }
+  25% {
+    content: ".";
+  }
+  50% {
+    content: "..";
+  }
+  75% {
+    content: "...";
+  }
+}
+
+.scroll-ink {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-ink-4) transparent;
+}
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

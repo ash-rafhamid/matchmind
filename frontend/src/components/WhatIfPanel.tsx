@@ -1,22 +1,23 @@
-import { FlaskConical, Loader2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { api } from '../api'
 import { useClock } from '../lib/clock'
 import { useMatch } from '../lib/match'
 import { useSettings } from '../lib/settings'
+import { teamInk } from '../lib/ui'
 import type { CrewResult, Side, WhatIfResult, WhatIfSummary } from '../types'
 import StoryText from './StoryText'
 import { TraceButton, VerifiedBadge } from './Trace'
 
-const DIAL_LABEL: Record<string, string> = {
-  press: 'Pressing intensity',
-  tempo: 'Tempo',
-  directness: 'Directness',
-  width: 'Width',
-  line_height: 'Defensive line height',
-  counter: 'Counter-attack urge',
+const DIAL: Record<string, [string, string, string]> = {
+  press: ['Pressing', 'sit off', 'hunt the ball'],
+  tempo: ['Tempo', 'patient', 'quick'],
+  directness: ['Directness', 'short passing', 'long balls'],
+  width: ['Width', 'narrow', 'wide'],
+  line_height: ['Defensive line', 'deep', 'high'],
+  counter: ['Counter-attacks', 'rarely', 'at every chance'],
 }
 
+/** The what-if lab: change a team's tactics from any minute, replay the rest of the match hundreds of times. */
 export default function WhatIfPanel() {
   const { pkg, clock } = useMatch()
   const { persona, lang, options } = useSettings()
@@ -48,6 +49,7 @@ export default function WhatIfPanel() {
   const run = async () => {
     setBusy(true)
     setError(null)
+    setRes(null)
     try {
       const payload = Object.fromEntries(changed.map((k) => [k, changes[k]]))
       setRes(await api.whatif(pkg.meta.id, { team: side, from_minute: minute, changes: payload, runs, persona, lang }))
@@ -59,156 +61,169 @@ export default function WhatIfPanel() {
   }
 
   return (
-    <div className="scroll-thin -mr-2 h-full space-y-4 overflow-y-auto pr-2 text-sm">
-      <p className="text-ink-300">
-        Change a team's tactics at any minute. We replay the match to that point, then simulate the rest hundreds of
-        times with and without the change - same random draws for both, so the difference is the tactics, not luck.
+    <div className="scroll-ink -mr-3 h-full overflow-y-auto pr-3">
+      <p className="display text-[22px] leading-[1.6] text-ink-2">
+        What if{' '}
+        <select
+          value={side}
+          onChange={(e) => {
+            setSide(e.target.value as Side)
+            setChanges({})
+            setRes(null)
+          }}
+          className="inline-select"
+          aria-label="Team"
+        >
+          <option value="home">{pkg.meta.teams.home.name}</option>
+          <option value="away">{pkg.meta.teams.away.name}</option>
+        </select>{' '}
+        had changed things at minute{' '}
+        <input type="number" min={5} max={88} value={minute} onChange={(e) => setMinute(Math.max(5, Math.min(88, +e.target.value || 5)))} className="inline-input" aria-label="Minute" />
+        , switching to{' '}
+        <select value={String(value('formation'))} onChange={(e) => setChanges((c) => ({ ...c, formation: e.target.value }))} className="inline-select" aria-label="Formation">
+          {(options?.formations ?? []).map((f) => (
+            <option key={f}>{f}</option>
+          ))}
+        </select>
+        ?
       </p>
-      <div className="flex flex-wrap gap-2">
-        {(['home', 'away'] as Side[]).map((s) => (
-          <button
-            key={s}
-            onClick={() => {
-              setSide(s)
-              setChanges({})
-              setRes(null)
-            }}
-            className={`rounded-lg border px-3 py-1.5 ${side === s ? 'border-mint-500 bg-mint-500/10' : 'border-ink-700'}`}
-          >
-            {pkg.meta.teams[s].name}
-          </button>
-        ))}
-      </div>
-      <label className="block">
-        <div className="flex justify-between text-xs text-ink-400">
-          <span>Make the change at minute</span>
-          <span className="font-semibold text-ink-100">{minute}'</span>
-        </div>
-        <input type="range" min={5} max={88} value={minute} onChange={(e) => setMinute(+e.target.value)} className="w-full" />
-      </label>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(options?.dials ?? Object.keys(DIAL_LABEL)).map((k) => {
+      <p className="mt-2 text-[14px] text-ink-3 italic">
+        We replay the match to that minute, then play the rest out {runs} times as it was and {runs} times with your change -
+        same random draws for both, so the difference is the tactics, not luck.
+      </p>
+
+      <div className="mt-5 border-t border-ink">
+        {(options?.dials ?? Object.keys(DIAL)).map((k) => {
+          const [label, lo, hi] = DIAL[k] ?? [k, 'low', 'high']
           const v = Number(value(k))
           const base = Number(baseline[k])
+          const moved = Math.abs(v - base) > 1e-9
           return (
-            <label key={k} className="block">
-              <div className="flex justify-between text-xs">
-                <span className="text-ink-400">{DIAL_LABEL[k] ?? k}</span>
-                <span className={v !== base ? 'font-semibold text-mint-400' : 'text-ink-300'}>
-                  {v.toFixed(2)}
-                  {v !== base && <span className="text-ink-400"> (was {base.toFixed(2)})</span>}
+            <label key={k} className="grid grid-cols-[120px_1fr_70px] items-center gap-3 border-b border-rule py-2.5">
+              <span className={`label ${moved ? 'text-signal' : 'label-ink'}`}>{label}</span>
+              <span className="block">
+                <span className="relative block">
+                  <input type="range" min={0} max={1} step={0.05} value={v} onChange={(e) => setChanges((c) => ({ ...c, [k]: +e.target.value }))} aria-label={label} />
+                  {moved && <span className="pointer-events-none absolute top-[5px] h-3 w-px bg-ink-3" style={{ left: `calc(${base * 100}% - ${base * 12}px + 6px)` }} title="as played" />}
                 </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={v}
-                onChange={(e) => setChanges((c) => ({ ...c, [k]: +e.target.value }))}
-                className="w-full"
-              />
+                <span className="flex justify-between text-[11px] text-ink-3 italic">
+                  <span>{lo}</span>
+                  <span>{hi}</span>
+                </span>
+              </span>
+              <span className="text-right num text-[13px]">
+                {v.toFixed(2)}
+                {moved && <span className="block text-[10px] text-ink-3">was {base.toFixed(2)}</span>}
+              </span>
             </label>
           )
         })}
-        <label className="block">
-          <div className="text-xs text-ink-400">Formation</div>
-          <select
-            value={String(value('formation'))}
-            onChange={(e) => setChanges((c) => ({ ...c, formation: e.target.value }))}
-            className="mt-1 w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5"
-          >
-            {(options?.formations ?? []).map((f) => (
-              <option key={f}>{f}</option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <div className="text-xs text-ink-400">Simulations</div>
-          <select value={runs} onChange={(e) => setRuns(+e.target.value)} className="mt-1 w-full rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5">
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <button onClick={run} disabled={busy || changed.length === 0} className="btn btn-solid">
+          {busy ? <span className="typing">Playing {runs * 2} endings</span> : <>Simulate &rarr;</>}
+        </button>
+        <label className="label flex items-center gap-2">
+          Runs
+          <select value={runs} onChange={(e) => setRuns(+e.target.value)} className="inline-select num !text-[13px] !not-italic">
             {[100, 200, 400].map((r) => (
               <option key={r} value={r}>
-                {r} x 2
+                {r} × 2
               </option>
             ))}
           </select>
         </label>
+        {changed.length === 0 && <span className="text-[14px] text-ink-3 italic">Move a dial or change the shape to begin.</span>}
       </div>
-      <button
-        onClick={run}
-        disabled={busy || changed.length === 0}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-mint-500 py-2.5 font-semibold text-ink-950 hover:bg-mint-400 disabled:opacity-40"
-      >
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <FlaskConical size={16} />}
-        {busy ? `Simulating ${runs * 2} match endings...` : changed.length ? `Run what-if (${changed.join(', ')})` : 'Change a dial to start'}
-      </button>
-      {error && <div className="text-rose-400">{error}</div>}
-      {res && <WhatIfResultView res={res.result} explanation={res.explanation} />}
+      {error && <p className="mt-3 text-[14px] text-signal">{error}</p>}
+      {res && <Result res={res.result} explanation={res.explanation} />}
     </div>
   )
 }
 
-function WhatIfResultView({ res, explanation }: { res: WhatIfResult; explanation?: CrewResult }) {
-  const verdictColor = res.verdict === 'helps' ? 'text-mint-400' : res.verdict === 'hurts' ? 'text-rose-400' : 'text-amber-400'
+function Result({ res, explanation }: { res: WhatIfResult; explanation?: CrewResult }) {
+  const { pkg } = useMatch()
   const [lo, hi] = res.expected_points_delta_95ci
+  const color = res.verdict === 'helps' ? 'text-proof' : res.verdict === 'hurts' ? 'text-signal' : 'text-ink-2'
+  const c = teamInk(pkg.meta.teams[res.side])
+  const sign = (v: number) => (v > 0 ? `+${v}` : `${v}`)
   return (
-    <div className="animate-rise space-y-3 rounded-xl border border-ink-700 bg-ink-900/60 p-3.5">
-      <div className="flex items-center justify-between">
-        <div className="font-semibold">
-          {res.team} from {res.from_minute}'
+    <section className="rise mt-6 border-t-2 border-ink pt-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="label">The verdict</div>
+          <div className="display mt-1 text-[20px] leading-snug font-semibold">
+            {res.team}, from {res.from_minute}'
+          </div>
+          <div className="mt-1 num text-[11px] text-ink-3">
+            score then {Object.values(res.score_at_minute).join('–')} · {res.runs} paired runs · {res.seconds}s
+          </div>
         </div>
-        <div className={`font-display text-xl font-semibold uppercase ${verdictColor}`}>{res.verdict}</div>
+        <span className={`stamp stamp-in shrink-0 text-[15px] ${color}`}>{res.verdict}</span>
       </div>
-      <OutcomeBar label="As played" s={res.as_played} />
-      <OutcomeBar label="With change" s={res.with_change} />
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <Stat label="Exp. points" a={res.as_played.expected_points} b={res.with_change.expected_points} />
-        <Stat label="xG for" a={res.as_played.xg_for_rest_of_match} b={res.with_change.xg_for_rest_of_match} />
-        <Stat label="xG against" a={res.as_played.xg_against_rest_of_match} b={res.with_change.xg_against_rest_of_match} invert />
+
+      <div className="mt-5 space-y-3">
+        <Bar label="As played" s={res.as_played} color={c} />
+        <Bar label="With your change" s={res.with_change} color={c} />
       </div>
-      <div className="text-xs text-ink-400">
-        Expected points change {res.expected_points_delta >= 0 ? '+' : ''}
-        {res.expected_points_delta} (95% interval {lo} to {hi}) · {res.runs} paired simulations in {res.seconds}s
-      </div>
+
+      <table className="mt-5 w-full text-[14px]">
+        <tbody>
+          {(
+            [
+              ['Expected points', res.as_played.expected_points, res.with_change.expected_points, false],
+              ['xG for, rest of match', res.as_played.xg_for_rest_of_match, res.with_change.xg_for_rest_of_match, false],
+              ['xG against, rest of match', res.as_played.xg_against_rest_of_match, res.with_change.xg_against_rest_of_match, true],
+            ] as [string, number, number, boolean][]
+          ).map(([label, a, b, invert]) => {
+            const d = Math.round((b - a) * 100) / 100
+            const good = invert ? d < 0 : d > 0
+            return (
+              <tr key={label} className="border-b border-rule">
+                <td className="py-2 italic">{label}</td>
+                <td className="py-2 text-right num">{a}</td>
+                <td className="px-2 py-2 text-center text-ink-4">&rarr;</td>
+                <td className="py-2 text-right num font-semibold">{b}</td>
+                <td className={`w-16 py-2 text-right num text-[12px] ${d === 0 ? 'text-ink-3' : good ? 'text-proof' : 'text-signal'}`}>{sign(d)}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <p className="mt-2 num text-[11px] text-ink-3">
+        Change in expected points {sign(res.expected_points_delta)} · 95% interval {lo} to {hi}
+      </p>
       {explanation && (
-        <div className="border-t border-ink-700 pt-3">
-          <StoryText text={explanation.text} />
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+        <div className="mt-5 border-t border-rule pt-4">
+          <div className="label">The Tactician's reading</div>
+          <StoryText text={explanation.text} className="mt-2" />
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <VerifiedBadge verdict={explanation.verdict} mode={explanation.mode} />
-            <TraceButton trace={explanation.trace} title={`What-if: ${res.team} from ${res.from_minute}'`} />
+            <TraceButton trace={explanation.trace} title={`What if: ${res.team} from ${res.from_minute}'`} />
           </div>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
-function OutcomeBar({ label, s }: { label: string; s: WhatIfSummary }) {
+function Bar({ label, s, color }: { label: string; s: WhatIfSummary; color: string }) {
   return (
     <div>
-      <div className="mb-1 flex justify-between text-xs text-ink-400">
-        <span>{label}</span>
-        <span>
+      <div className="flex items-baseline justify-between">
+        <span className="text-[14px] italic">{label}</span>
+        <span className="num text-[11px] text-ink-3">
           W {s.win_pct}% · D {s.draw_pct}% · L {s.loss_pct}%
         </span>
       </div>
-      <div className="flex h-3 overflow-hidden rounded-full bg-ink-700">
-        <div className="bg-mint-500" style={{ width: `${s.win_pct}%` }} />
-        <div className="bg-ink-400" style={{ width: `${s.draw_pct}%` }} />
-        <div className="bg-rose-400" style={{ width: `${s.loss_pct}%` }} />
-      </div>
-    </div>
-  )
-}
-
-function Stat({ label, a, b, invert = false }: { label: string; a: number; b: number; invert?: boolean }) {
-  const better = invert ? b < a : b > a
-  return (
-    <div className="rounded-lg bg-ink-800 p-2">
-      <div className="text-ink-400">{label}</div>
-      <div className="font-display text-lg">
-        {a} <span className="text-ink-400">&rarr;</span>{' '}
-        <span className={b === a ? '' : better ? 'text-mint-400' : 'text-rose-400'}>{b}</span>
+      <div className="mt-1 flex h-4 border border-ink">
+        <div style={{ width: `${s.win_pct}%`, background: color }} title={`Win ${s.win_pct}%`} />
+        <div
+          style={{ width: `${s.draw_pct}%`, backgroundImage: 'repeating-linear-gradient(45deg, #141310 0 1px, transparent 1px 5px)' }}
+          title={`Draw ${s.draw_pct}%`}
+        />
+        <div className="flex-1 bg-paper-3" title={`Loss ${s.loss_pct}%`} />
       </div>
     </div>
   )

@@ -1,57 +1,67 @@
-import { Pause, Play, Rewind } from 'lucide-react'
 import { formatClock, useClock } from '../lib/clock'
 import { scoreAt, useMatch } from '../lib/match'
+import { surname } from '../lib/ui'
+import type { Side } from '../types'
 
-const SPEEDS = [1, 4, 8, 16, 32]
-
+/** The match set as a headline: names, the live score in big numerals, scorers so far, and the clock. */
 export default function Scoreboard() {
-  const { pkg, clock } = useMatch()
-  const { time, playing, speed } = useClock(clock, 6)
+  const { pkg, clock, name } = useMatch()
+  const { time, playing } = useClock(clock, 6)
   const { home, away } = pkg.meta.teams
   const firstHalf = pkg.meta.period_lengths_s['1']
   const score = scoreAt(pkg.events, time)
   const ended = time >= pkg.meta.duration_s - 0.5
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-stretch overflow-hidden rounded-xl border border-ink-700 font-display text-xl font-semibold">
-        <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: home.primary, color: home.secondary }}>
-          {home.short}
-        </div>
-        <div className="flex items-center bg-ink-900 px-3 tabular-nums">
-          {score.home} - {score.away}
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1.5" style={{ background: away.primary, color: away.secondary }}>
-          {away.short}
-        </div>
-        <div className="flex min-w-20 items-center justify-center gap-1.5 bg-ink-800 px-3 text-mint-400 tabular-nums">
-          {playing && <span className="live-dot h-2 w-2 rounded-full bg-rose-400" />}
-          {ended ? 'FT' : formatClock(time, firstHalf)}
-        </div>
-      </div>
+  const atHalf = Math.abs(time - firstHalf) < 1 && !playing
+  const status = ended ? 'Full time' : time < 1 ? 'Kick-off' : atHalf ? 'Half time' : formatClock(time, firstHalf)
 
-      <div className="flex items-center gap-1 rounded-xl border border-ink-700 bg-ink-850 p-1">
-        <button className="rounded-lg p-1.5 hover:bg-ink-700" onClick={() => clock.seek(0)} title="Back to kick-off" aria-label="Back to kick-off">
-          <Rewind size={16} />
-        </button>
-        <button className="rounded-lg bg-mint-500 p-1.5 text-ink-950 hover:bg-mint-400" onClick={() => clock.toggle()} aria-label={playing ? 'Pause' : 'Play'}>
-          {playing ? <Pause size={16} /> : <Play size={16} />}
-        </button>
-        {SPEEDS.map((s) => (
-          <button
-            key={s}
-            onClick={() => clock.setSpeed(s)}
-            className={`rounded-lg px-2 py-1 text-xs font-semibold ${speed === s ? 'bg-ink-600 text-ink-100' : 'text-ink-400 hover:bg-ink-700'}`}
-          >
-            {s}x
-          </button>
-        ))}
+  const scorers = (side: Side) => {
+    const goals = pkg.events.filter((e) => e.type === 'goal' && e.team === side && e.ts <= time)
+    const by = new Map<string, string[]>()
+    for (const g of goals) {
+      const who = surname(name(g.player))
+      by.set(who, [...(by.get(who) ?? []), g.clock])
+    }
+    return [...by.entries()].map(([who, mins]) => `${who} ${mins.join(', ')}`)
+  }
+
+  const side = (s: Side, align: 'left' | 'right') => {
+    const t = pkg.meta.teams[s]
+    const goals = scorers(s)
+    return (
+      <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+        <div className={`flex items-center gap-3 ${align === 'right' ? 'flex-row-reverse' : ''}`}>
+          <span className="inline-flex h-6 w-6 shrink-0 border border-ink" aria-hidden>
+            <span className="h-full w-1/2" style={{ background: t.primary }} />
+            <span className="h-full w-1/2" style={{ background: t.secondary }} />
+          </span>
+          <h1 className="display text-[22px] leading-[1.05] font-semibold sm:text-[30px] lg:text-[40px]">{t.name}</h1>
+        </div>
+        <div className="mt-1 label">
+          {t.dna.formation} · {t.coach}
+        </div>
+        <div className="mt-2 min-h-[1.5em] text-[15px] text-ink-2 italic">{goals.join(' · ')}</div>
       </div>
-      <div className="ml-auto hidden text-right text-xs text-ink-400 md:block">
-        <div>{pkg.meta.competition}</div>
-        <div>
-          {home.dna.formation} {home.name} vs {away.name} {away.dna.formation}
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-x-4 py-6 sm:gap-x-10">
+      {side('home', 'right')}
+      <div className="text-center">
+        <div className="display text-[56px] leading-[0.85] font-semibold tabular-nums sm:text-[84px] lg:text-[104px]" aria-live="polite">
+          {score.home}
+          <span className="px-1 text-ink-4 sm:px-3">–</span>
+          {score.away}
+        </div>
+        <div className="mt-3 flex items-center justify-center gap-2 num text-[13px] tracking-wide uppercase">
+          {playing && !ended && <span className="live-dot" />}
+          <span className={playing ? 'text-signal' : 'text-ink-2'}>{status}</span>
         </div>
       </div>
+      {side('away', 'left')}
+      <span className="sr-only">
+        {home.name} {score.home}, {away.name} {score.away}
+      </span>
     </div>
   )
 }
