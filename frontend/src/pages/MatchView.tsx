@@ -9,34 +9,31 @@ import WhatIfPanel from '../components/WhatIfPanel'
 import { PlaybackClock } from '../lib/clock'
 import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
 import { TrackingStore } from '../lib/tracking'
+import { useT } from '../lib/settings'
 import { onPrimary } from '../lib/ui'
 import type { CameraMode } from '../scene/Stadium'
 import type { MatchEvent, MatchPackage, Moment, Side } from '../types'
 
 const Miniature = lazy(() => import('../components/Miniature'))
 
-const TABS = [
-  ['live', 'Live'],
-  ['ask', 'Ask'],
-  ['whatif', 'What if'],
-  ['recap', 'Report'],
-] as const
+const TABS = ['live', 'ask', 'whatif', 'recap'] as const
 
-type Tab = (typeof TABS)[number][0]
+type Tab = (typeof TABS)[number]
 
 export default function MatchView({ matchId }: { matchId: string }) {
   const [pkg, setPkg] = useState<MatchPackage | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const t = useT()
 
   useEffect(() => {
     api.match(matchId).then(setPkg).catch((e) => setError(String(e.message ?? e)))
   }, [matchId])
 
-  if (error) return <p className="p-10 text-flare">This match could not be found: {error}</p>
+  if (error) return <p className="p-10 text-flare">{t('match.notFound')}: {error}</p>
   if (!pkg)
     return (
       <div className="grid h-[calc(100vh-52px)] place-items-center bg-ink">
-        <p className="working cond text-volt">Building the stadium</p>
+        <p className="working cond text-volt">{t('app.loadingStadium')}</p>
       </div>
     )
   return <LoadedMatch pkg={pkg} />
@@ -53,6 +50,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const [focusMoment, setFocusMoment] = useState<string | null>(null)
   const eventsById = useMemo(() => new Map(pkg.events.map((e) => [e.id, e])), [pkg.events])
   const goals = useMemo(() => pkg.events.filter((e) => e.type === 'goal'), [pkg.events])
+  const t = useT()
 
   useEffect(() => () => clock.destroy(), [clock])
   useEffect(() => store.prefetch(0), [store])
@@ -93,7 +91,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
       <div className="grid xl:h-[calc(100vh-52px)] xl:grid-cols-[minmax(0,1fr)_440px]">
         <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
           <div className="relative min-h-[340px] flex-1">
-            <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">Building the stadium</p>}>
+            <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">{t('app.loadingStadium')}</p>}>
               <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} className="absolute inset-0" />
             </Suspense>
             <div className="stage-shade pointer-events-none absolute inset-0" />
@@ -105,7 +103,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
                 <CameraSwitch mode={cam} onMode={setCam} />
                 {highlight.length > 0 && (
                   <button onClick={() => setHighlight([])} className="cut-both bg-flare px-3 py-1 cond text-[11px] text-white">
-                    Clear {highlight.length} marker{highlight.length > 1 ? 's' : ''} ✕
+                    {t('match.clearMarkers')}
                   </button>
                 )}
               </div>
@@ -131,12 +129,12 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
         <aside className="plate flex min-h-[640px] min-w-0 flex-col xl:min-h-0">
           <div className="flex items-center justify-between bg-ink px-5 py-3 text-white">
             <span className="xp text-[17px]">
-              The crew<span className="xp-light text-white/50"> / on air</span>
+              {t('match.crew')}<span className="xp-light text-white/50"> {t('match.onAir')}</span>
             </span>
-            <span className="cond text-[10px] text-white/45">Producer · Analyst · Tactician · Storyteller · Fact-checker</span>
+            <span className="hidden cond text-[10px] text-white/45 sm:inline">{t('match.crewList')}</span>
           </div>
           <nav className="flex border-b border-line" role="tablist" aria-label="Crew">
-            {TABS.map(([id, label]) => (
+            {TABS.map((id) => (
               <button
                 key={id}
                 role="tab"
@@ -144,7 +142,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
                 onClick={() => setTab(id)}
                 className={`flex-1 py-3 cond text-[12px] transition-colors ${tab === id ? 'bg-volt text-ink' : 'text-ink-3 hover:bg-concrete hover:text-ink'}`}
               >
-                {label}
+                {t(`tab.${id}`)}
               </button>
             ))}
           </nav>
@@ -156,13 +154,13 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
           </div>
           <div className="flex items-center justify-between border-t border-line px-5 py-2.5">
             <a href={`#/studio/${pkg.meta.id}`} target="_blank" rel="noreferrer" className="act">
-              Studio overlay ↗
+              {t('match.studio')}
             </a>
             <a href={`/api/matches/${pkg.meta.id}/export.zip`} className="act">
-              Dataset ↓
+              {t('match.dataset')}
             </a>
             <a href="#centre" className="act">
-              Numbers ↓
+              {t('match.numbers')}
             </a>
           </div>
         </aside>
@@ -192,24 +190,25 @@ function CrossingWatch({ goals, onGoal, onMoment }: { goals: MatchEvent[]; onGoa
 
 function TeamSheets() {
   const { pkg } = useMatch()
+  const t = useT()
   return (
     <section className="mx-auto grid max-w-[1480px] gap-6 px-4 pb-16 sm:px-8 md:grid-cols-2">
       {(['home', 'away'] as Side[]).map((s) => {
-        const t = pkg.meta.teams[s]
-        const byId = new Map(t.players.map((p) => [p.id, p]))
+        const team = pkg.meta.teams[s]
+        const byId = new Map(team.players.map((p) => [p.id, p]))
         return (
           <div key={s} className="plate p-5">
             <div className="flex items-stretch">
-              <span className="cut-r px-3 py-1.5 xp text-[16px]" style={{ background: t.primary, color: onPrimary(t) }}>
-                {t.name}
+              <span className="cut-r px-3 py-1.5 xp text-[16px]" style={{ background: team.primary, color: onPrimary(team) }}>
+                {team.name}
               </span>
               <span className="self-center pl-3 cond text-ink-3">
-                {t.dna.formation} · coach {t.coach}
+                {team.dna.formation} · {t('stats.coach')} {team.coach}
               </span>
             </div>
-            <p className="mt-3 text-[13px] text-ink-3">{t.traits.length ? t.traits.join(' · ') : 'balanced'}</p>
+            <p className="mt-3 text-[13px] text-ink-3">{team.traits.length ? team.traits.join(' · ') : t('stats.balanced')}</p>
             <ol className="mt-3 grid grid-cols-2 gap-x-6 text-[14px]">
-              {t.starters.map((pid) => {
+              {team.starters.map((pid) => {
                 const p = byId.get(pid)
                 return (
                   <li key={pid} className="flex items-center gap-3 border-t border-line py-1.5">
@@ -221,8 +220,8 @@ function TeamSheets() {
               })}
             </ol>
             <p className="mt-3 text-[12px] text-ink-3">
-              <span className="cond mr-2">Bench</span>
-              {t.bench.map((pid) => byId.get(pid)?.name).filter(Boolean).join(', ')}
+              <span className="cond me-2">{t('stats.bench')}</span>
+              {team.bench.map((pid) => byId.get(pid)?.name).filter(Boolean).join(', ')}
             </p>
           </div>
         )

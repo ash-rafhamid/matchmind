@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { formatClock, useClock } from '../lib/clock'
 import { lastEventIndex, scoreAt, useMatch } from '../lib/match'
-import { useSettings } from '../lib/settings'
-import { onPrimary, surname } from '../lib/ui'
+import { useSettings, useT } from '../lib/settings'
+import { momentTitle, onPrimary, surname } from '../lib/ui'
 import type { CameraMode } from '../scene/Stadium'
 import type { CrewResult, MatchEvent, Moment } from '../types'
 import StoryText from './StoryText'
@@ -44,21 +44,16 @@ export function ScoreBug() {
   )
 }
 
-const CAMS: [CameraMode, string][] = [
-  ['director', 'AI director'],
-  ['broadcast', 'TV'],
-  ['tactical', 'Tactical'],
-  ['goal', 'Goal cam'],
-  ['follow', 'Follow'],
-]
+const CAMS: CameraMode[] = ['director', 'broadcast', 'tactical', 'goal', 'follow']
 
 export function CameraSwitch({ mode, onMode }: { mode: CameraMode; onMode: (m: CameraMode) => void }) {
+  const t = useT()
   return (
     <div className="seg cut-both pl-2 shadow-[0_6px_24px_rgba(0,0,0,0.3)]" role="group" aria-label="Camera">
-      <span className="cond self-center pr-2 pl-1 text-[11px] text-ink-3">Camera</span>
-      {CAMS.map(([m, label]) => (
+      <span className="hidden cond self-center pe-2 ps-1 text-[11px] text-ink-3 sm:inline">{t('match.camera')}</span>
+      {CAMS.map((m) => (
         <button key={m} aria-pressed={mode === m} onClick={() => onMode(m)}>
-          {label}
+          {t(`cam.${m}`)}
         </button>
       ))}
     </div>
@@ -83,7 +78,7 @@ export function useCrossings(events: MatchEvent[] | Moment[], onCross: (e: Match
 /** Broadcast lower third: the crew's verified take on the moment that just happened. */
 export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone: () => void; onOpen: () => void }) {
   const { pkg } = useMatch()
-  const { persona, lang } = useSettings()
+  const { persona, lang, t } = useSettings()
   const [story, setStory] = useState<CrewResult | null>(null)
   const team = pkg.meta.teams[moment.team]
   const isGoal = moment.type === 'goal'
@@ -108,7 +103,7 @@ export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone:
           <span className="cond">{team.short}</span>
         </div>
         <div className="plate cut-r flex min-w-0 flex-1 items-center pr-6 pl-3">
-          <span className="xp truncate text-[15px]">{moment.title}</span>
+          <span className="xp truncate text-[15px]">{momentTitle(moment, t)}</span>
         </div>
       </div>
       <div className="plate px-5 pt-3 pb-3">
@@ -118,12 +113,12 @@ export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone:
             <div className="mt-2 flex items-center gap-4">
               <VerifiedBadge verdict={story.verdict} mode={story.mode} />
               <button onClick={onOpen} className="act ml-auto">
-                Full story &rarr;
+                {t('match.fullStory')}
               </button>
             </div>
           </div>
         ) : (
-          <p className="working cond text-ink-3">The crew is writing</p>
+          <p className="working cond text-ink-3">{t('match.crewWriting')}</p>
         )}
       </div>
     </div>
@@ -133,12 +128,13 @@ export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone:
 /** Full-stage takeover when a goal goes in. */
 export function GoalTakeover({ goal }: { goal: MatchEvent }) {
   const { pkg, name } = useMatch()
+  const t = useT()
   const team = pkg.meta.teams[goal.team]
   return (
     <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center overflow-hidden">
       <div className="wipe absolute inset-y-[30%] -right-10 -left-10 -skew-y-3" style={{ background: team.primary }} />
       <div className="wipe relative text-center" style={{ color: onPrimary(team), animationDelay: '0.12s' }}>
-        <div className="xp text-[min(18vw,190px)] leading-[0.8]">Goal</div>
+        <div className="xp text-[min(18vw,190px)] leading-[0.8]">{t('match.goal')}</div>
         <div className="mt-3 cond text-[18px] opacity-90">
           {surname(name(goal.player))} · {goal.clock} · {team.name}
         </div>
@@ -148,27 +144,25 @@ export function GoalTakeover({ goal }: { goal: MatchEvent }) {
 }
 
 const SPEEDS = [1, 4, 8, 16, 32]
-const ACTION: Record<string, string> = {
-  pass: 'Pass', carry: 'Carry', shot: 'Shot', interception: 'Interception', tackle: 'Tackle', save: 'Save',
-  clearance: 'Clearance', block: 'Block', foul: 'Foul', card: 'Card', offside: 'Offside', goal: 'Goal',
-}
+const ACTION = new Set(['pass', 'carry', 'shot', 'interception', 'tackle', 'save', 'clearance', 'block', 'foul', 'card', 'offside', 'goal'])
 
 /** Bottom bar of the stage: play, speed, the match timeline, and what is happening right now. */
 export function Transport() {
   const { pkg, clock, name } = useMatch()
   const { time, playing, speed } = useClock(clock, 6)
-  const shown = useMemo(() => pkg.events.filter((e) => e.type in ACTION), [pkg.events])
+  const t = useT()
+  const shown = useMemo(() => pkg.events.filter((e) => ACTION.has(e.type)), [pkg.events])
   const idx = lastEventIndex(shown, time)
   const cur = idx >= 0 && time - shown[idx].ts < 3 ? shown[idx] : null
 
   return (
     <div className="plate">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 pt-2.5 sm:px-4">
-        <button className="btn btn-volt !px-5 !py-2" onClick={() => clock.toggle()} aria-label={playing ? 'Pause' : 'Play'}>
-          {playing ? '❚❚' : '▶'} <span>{playing ? 'Pause' : 'Play'}</span>
+        <button className="btn btn-volt !px-5 !py-2" onClick={() => clock.toggle()} aria-label={playing ? t('match.pause') : t('match.play')}>
+          {playing ? '❚❚' : '▶'} <span>{playing ? t('match.pause') : t('match.play')}</span>
         </button>
         <button className="act" onClick={() => clock.seek(0)}>
-          ↺ Kick-off
+          {t('match.kickoff')}
         </button>
         <div className="seg" role="group" aria-label="Playback speed">
           {SPEEDS.map((s) => (
@@ -177,10 +171,10 @@ export function Transport() {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex min-h-[22px] items-center gap-2 text-[13px]">
+        <div className="ms-auto flex min-h-[22px] items-center gap-2 text-[13px]">
           {cur && (
             <>
-              <span className="cond text-ink-3">{ACTION[cur.type]}</span>
+              <span className="cond text-ink-3">{t(`act.${cur.type}`)}</span>
               <span className="font-semibold">
                 {surname(name(cur.player))}
                 {cur.receiver ? ` → ${surname(name(cur.receiver))}` : ''}

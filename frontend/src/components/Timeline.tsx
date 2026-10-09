@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatClock, useClock } from '../lib/clock'
 import { useMatch } from '../lib/match'
 
@@ -8,8 +8,10 @@ const MID = 28
 /** The match as a scrubber: momentum as a waveform in club colours, events as glyphs, a flare playhead. */
 export default function Timeline() {
   const { pkg, clock, name } = useMatch()
-  const { time } = useClock(clock, 12)
+  const { time } = useClock(clock, 2)
   const ref = useRef<SVGSVGElement>(null)
+  const head = useRef<SVGRectElement>(null)
+  const shade = useRef<SVGRectElement>(null)
   const [hover, setHover] = useState<number | null>(null)
   const dur = pkg.meta.duration_s
   const half = pkg.meta.period_lengths_s['1']
@@ -23,6 +25,17 @@ export default function Timeline() {
     return { bars, markers, ticks }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pkg, dur, half])
+
+  // the playhead follows the clock directly, without re-rendering the whole timeline
+  useEffect(
+    () =>
+      clock.subscribe(() => {
+        const x = (clock.time / dur) * 1000
+        head.current?.setAttribute('x', String(x - 1.5))
+        shade.current?.setAttribute('width', String(x))
+      }),
+    [clock, dur],
+  )
 
   const tAt = (clientX: number) => {
     const r = ref.current!.getBoundingClientRect()
@@ -58,7 +71,7 @@ export default function Timeline() {
           if (e.key === 'ArrowLeft') clock.seek(time - 30)
         }}
       >
-        <rect x="0" y="0" width={X(time)} height={H} fill="#0b0c0e" fillOpacity="0.04" />
+        <rect ref={shade} x="0" y="0" width={X(time)} height={H} fill="#0b0c0e" fillOpacity="0.04" />
         {bars.map((b, i) => {
           const h = Math.max(1.5, Math.abs(b.v) * 24)
           const isHome = b.v >= 0
@@ -76,7 +89,7 @@ export default function Timeline() {
           return <rect key={e.id} x={x - 3.5} y={y - 3.5} width="7" height="7" fill="none" stroke="#0b0c0e" strokeWidth="1.3" vectorEffect="non-scaling-stroke" transform={`rotate(45 ${x} ${y})`} />
         })}
         {hover !== null && <line x1={X(hover)} x2={X(hover)} y1="0" y2={H} stroke="#0b0c0e" strokeOpacity="0.35" vectorEffect="non-scaling-stroke" />}
-        <rect x={X(time) - 1.5} y="0" width="3" height={H} fill="#ff4d2e" />
+        <rect ref={head} x={X(time) - 1.5} y="0" width="3" height={H} fill="#ff4d2e" />
       </svg>
       <div className="pointer-events-none absolute inset-0">
         {ticks.map((t) => (

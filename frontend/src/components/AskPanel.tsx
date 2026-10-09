@@ -15,7 +15,7 @@ interface Turn {
 /** Questions to the Host agent, who looks things up through the match-data tools and answers with proof. */
 export default function AskPanel() {
   const { pkg } = useMatch()
-  const { persona, lang } = useSettings()
+  const { persona, lang, t } = useSettings()
   const [turns, setTurns] = useState<Turn[]>([])
   const [q, setQ] = useState('')
   const [busy, setBusy] = useState(false)
@@ -23,10 +23,10 @@ export default function AskPanel() {
   const { home, away } = pkg.meta.teams
   const firstGoal = pkg.analytics.moments.find((m) => m.type === 'goal')
   const suggestions = [
-    firstGoal ? `Why did ${firstGoal.team_name} score the first goal?` : `How did ${home.name} try to create chances?`,
-    'Who was the best player, and why?',
-    `What if ${away.name} had pressed much higher from the 60th minute?`,
-    'Who ran the most, and who was the fastest?',
+    firstGoal ? t('ask.q1', { team: firstGoal.team_name }) : t('ask.q1b', { team: home.name }),
+    t('ask.q2'),
+    t('ask.q3', { team: away.name }),
+    t('ask.q4'),
   ]
 
   const scroll = () => setTimeout(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' }), 40)
@@ -54,13 +54,12 @@ export default function AskPanel() {
         {turns.length === 0 && (
           <div>
             <div className="xp text-[26px] leading-[0.95]">
-              Ask the crew
+              {t('ask.title1')}
               <br />
-              <span className="xp-light">anything.</span>
+              <span className="xp-light">{t('ask.title2')}</span>
             </div>
             <p className="mt-3 text-[14px] text-ink-3">
-              The Host agent pulls the numbers through the match-data tools (MCP), asks the Tactician, can run what-if
-              simulations, and every answer is fact-checked.
+              {t('ask.intro')}
             </p>
             <ul className="mt-5">
               {suggestions.map((s, i) => (
@@ -68,32 +67,32 @@ export default function AskPanel() {
                   <button onClick={() => send(s)} className="group flex w-full items-center gap-3 border-t border-line py-3 text-left text-[14.5px] font-medium hover:bg-concrete">
                     <span className="cond w-6 text-ink-4 tab-num group-hover:text-ink">0{i + 1}</span>
                     <span className="flex-1">{s}</span>
-                    <span className="pr-1 text-ink-4 transition-transform group-hover:translate-x-1 group-hover:text-ink">→</span>
+                    <span className="pe-1 text-ink-4 transition-transform group-hover:translate-x-1 group-hover:text-ink rtl:rotate-180">→</span>
                   </button>
                 </li>
               ))}
             </ul>
           </div>
         )}
-        {turns.map((t, i) => (
+        {turns.map((turn, i) => (
           <div key={i} className="wipe-up pb-6">
             <div className="flex justify-end">
-              <p className="cut-l max-w-[88%] bg-ink py-2.5 pr-4 pl-6 text-[14.5px] font-medium text-white">{t.q}</p>
+              <p className="cut-l max-w-[88%] bg-ink py-2.5 ps-6 pe-4 text-[14.5px] font-medium text-white">{turn.q}</p>
             </div>
             <div className="mt-3">
-              <div className="cond text-[11px] text-ink-3">Host · {t.a ? 'answered' : 'working'}</div>
-              {t.a ? (
+              <div className="cond text-[11px] text-ink-3">{t('ask.host')} · {turn.a ? t('ask.answered') : t('ask.working')}</div>
+              {turn.a ? (
                 <div className="fade-in mt-1">
-                  <StoryText text={t.a.answer} />
+                  <StoryText text={turn.a.answer} />
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-                    <VerifiedBadge verdict={t.a.verdict} />
-                    <TraceButton trace={t.a.trace} title={t.q} />
+                    <VerifiedBadge verdict={turn.a.verdict} />
+                    <TraceButton trace={turn.a.trace} title={turn.q} />
                   </div>
                 </div>
-              ) : t.error ? (
-                <p className="mt-1 text-[13px] text-flare">{t.error}</p>
+              ) : turn.error ? (
+                <p className="mt-1 text-[13px] text-flare">{turn.error}</p>
               ) : (
-                <p className="working mt-1 text-[14px] text-ink-3">Calling the match-data tools</p>
+                <p className="working mt-1 text-[14px] text-ink-3">{t('ask.calling')}</p>
               )}
             </div>
           </div>
@@ -106,9 +105,9 @@ export default function AskPanel() {
         }}
         className="flex items-stretch gap-0 border-t border-line p-3"
       >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Why did..., Who..., What if..." className="field" maxLength={400} aria-label="Your question for the crew" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('ask.placeholder')} className="field" maxLength={400} aria-label="Your question for the crew" />
         <button disabled={busy || q.trim().length < 3} className="btn btn-volt shrink-0 !px-5">
-          Ask
+          {t('ask.send')}
         </button>
       </form>
     </div>

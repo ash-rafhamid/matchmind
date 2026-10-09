@@ -10,6 +10,7 @@ Usage: python scripts/precompute.py [lang ...]     (default: en)
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 import time
 from pathlib import Path
@@ -60,7 +61,7 @@ async def main(langs: list[str]) -> None:
         pkg = store.load(summary["id"])
         mid = summary["id"]
         for lang in langs:
-            for persona in PERSONAS:
+            for persona in [p for p in PERSONAS if p in os.environ.get("PERSONAS", ",".join(PERSONAS)).split(",")]:
                 for m in pkg["analytics"]["moments"]:
                     key = cache.make_key(model.provider, model.model, "moment", mid, m["id"], persona, lang)
                     tasks.append(one(key, Job("moment", moment_packet(pkg, m), persona, lang, store.LEAGUE_ROSTER)))

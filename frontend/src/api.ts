@@ -27,6 +27,7 @@ export interface TrackingChunk {
   ball: number[]
   ball_z?: number[]
   on_ball?: number[]
+  enc?: 'delta'
   scale: number
 }
 
@@ -36,7 +37,7 @@ export const api = {
   matches: () => call<MatchSummary[]>('/api/matches'),
   match: (id: string) => call<MatchPackage>(`/api/matches/${id}`),
   tracking: (id: string, start: number, seconds: number) =>
-    call<TrackingChunk>(`/api/matches/${id}/tracking?start=${start}&seconds=${seconds}&hz=10`),
+    call<TrackingChunk>(`/api/matches/${id}/tracking?start=${start}&seconds=${seconds}&hz=10&enc=delta`),
   story: (id: string, momentId: string, persona: string, lang: string) =>
     call<CrewResult>(`/api/matches/${id}/moments/${momentId}/story?persona=${persona}&lang=${lang}`),
   recap: (id: string, persona: string, lang: string) =>

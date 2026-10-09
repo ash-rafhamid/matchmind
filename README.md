@@ -20,7 +20,10 @@ viewer gets a verified template instead. Nothing unverified reaches the screen.
 
 | Feature | What you see | How it works |
 |---|---|---|
-| **Live crew** | Key moments appear as the replay runs, with clickable `▶ 37'` evidence chips that replay the build-up on the pitch | Moment detector -> Agent Framework workflow (Analyst ∥ Tactician -> Storyteller -> Fact-checker loop) |
+| **Matchday Miniature** | Every match plays in a living 3D tabletop stadium: kitted footballers whose strides match their real speed, a ball that flies in arcs, a crowd that celebrates, AR pass/shot arcs and name/speed tags drawn into the scene | three.js (instanced figures, tilt-shift focused on the ball), driven by the event-anchored 10 Hz tracking; adaptive quality and off-screen pausing keep it smooth |
+| **AI director** | The camera cuts to the goal for big chances, circles the scorer after a goal, follows play like TV - or pick TV, Tactical, Goal cam, Follow | Shot and goal events drive camera "shots"; broadcast graphics (score bug, lower thirds, GOAL takeover) react to the same events |
+| **Live crew** | Key moments appear as the replay runs, with clickable `▶ 37'` evidence chips that replay the build-up in 3D | Moment detector -> Agent Framework workflow (Analyst ∥ Tactician -> Storyteller -> Fact-checker loop) |
+| **10 languages, whole site** | One "Commentary" button switches the interface (incl. right-to-left Arabic) and every story, answer and report | Interface strings translated by the Foundry model (`scripts/translate_ui.py`); commentary pre-written and verified in every language for the featured matches |
 | **5 audiences x 10 languages** | The same goal explained for a fan, an analyst, an 8-year-old, a coach, or as spoken audio description | Persona + language brief to the Storyteller; browser speech for "Listen" |
 | **Ask the crew** | "Who ran the most?" "Why did they concede?" "What if Ironvale pressed higher?" | Host agent calling 9 match-data tools (in-process or via the **MCP server**), consulting a Tactician sub-agent, answer fact-checked against every tool result |
 | **What-if Lab** | Win/draw/loss and xG for the rest of the match, as played vs. with your tactical change, with a 95% interval and a verdict | Deterministic replay to minute M, then paired Monte Carlo with common random numbers (2 x 200 simulations in ~5 s) |

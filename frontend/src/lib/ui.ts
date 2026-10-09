@@ -27,3 +27,18 @@ export const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi']
 
 /** Surname for compact labels ("Jonah Lindqvist" -> "Lindqvist"). */
 export const surname = (full: string) => full.split(' ').slice(-1)[0] ?? full
+
+type T = (key: string, vars?: Record<string, string | number>) => string
+
+/** Moment titles come from the analytics in English; rebuild them from translated templates. */
+export function momentTitle(m: { type: string; title: string; team_name: string }, t: T): string {
+  const team = m.team_name
+  let g: RegExpMatchArray | null
+  if (m.type === 'goal' && (g = m.title.match(/^GOAL - (.+?) \(/))) return t(m.title.endsWith('from the spot') ? 'title.goal_pen' : 'title.goal', { player: g[1], team })
+  if (m.type === 'big_chance' && (g = m.title.match(/^Big chance (saved|missed) - (.+)$/))) return t(g[1] === 'saved' ? 'title.chance_saved' : 'title.chance_missed', { player: g[2] })
+  if (m.type === 'save' && (g = m.title.match(/^Fine save by (.+)$/))) return t('title.save', { player: g[1] })
+  if (m.type === 'red_card' && (g = m.title.match(/^Red card - (.+)$/))) return t('title.red_card', { player: g[1] })
+  if (m.type === 'tactical_change') return t('title.tactical_change', { team })
+  if (m.type === 'momentum') return t('title.momentum', { team })
+  return m.title
+}
