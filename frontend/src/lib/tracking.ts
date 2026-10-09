@@ -30,6 +30,15 @@ interface Chunk {
   scale: number
 }
 
+/** How long each animation cue lasts (seconds), by kind - see CUE in backend/matchmind/engine/choreo.py. */
+export const CUE_DURATION: Record<number, number> = { 1: 0.45, 2: 0.6, 3: 0.55, 4: 1.0, 5: 0.5, 6: 1.8, 7: 0.95, 8: 0.95, 9: 0.5 }
+
+export interface ActiveCue {
+  kind: number
+  /** 0 at the start of the movement, 1 at the end */
+  u: number
+}
+
 /** Undo the server's frame-to-frame delta encoding. */
 function decode(c: TrackingChunk): Chunk {
   const n = c.players.length
@@ -58,6 +67,8 @@ export class TrackingStore {
   private readonly matchId: string
   private readonly version: string
   private out: Frame | null = null
+  private cues: [number, number, number][] = []
+  private active = new Map<number, ActiveCue>()
 
   constructor(matchId: string, version = '') {
     this.matchId = matchId
@@ -69,7 +80,13 @@ export class TrackingStore {
     this.chunks.set(idx, 'loading')
     api
       .tracking(this.matchId, idx * CHUNK_SECONDS, CHUNK_SECONDS, this.version)
-      .then((c) => this.chunks.set(idx, decode(c)))
+      .then((c) => {
+        this.chunks.set(idx, decode(c))
+        if (c.cues?.length) {
+          this.cues.push(...c.cues)
+          this.cues.sort((a, b) => a[0] - b[0])
+        }
+      })
       .catch(() => this.chunks.delete(idx))
   }
 
@@ -93,6 +110,25 @@ export class TrackingStore {
   private chunk(t: number): Chunk | null {
     const c = this.chunks.get(Math.floor(t / CHUNK_SECONDS))
     return c && c !== 'loading' && c.frames > 0 ? c : null
+  }
+
+  /** The movements (kicks, tackles, slides, falls, dives) players are in the middle of at time t, by column. */
+  activeCues(t: number): Map<number, ActiveCue> {
+    this.active.clear()
+    const list = this.cues
+    let lo = 0
+    let hi = list.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (list[mid][0] < t - 2) lo = mid + 1
+      else hi = mid
+    }
+    for (let i = lo; i < list.length && list[i][0] <= t; i++) {
+      const [start, col, kind] = list[i]
+      const u = (t - start) / (CUE_DURATION[kind] ?? 0.5)
+      if (u >= 0 && u <= 1) this.active.set(col, { kind, u })
+    }
+    return this.active
   }
 
   /** Ball position and height only - cheap enough to sample several times per frame. */

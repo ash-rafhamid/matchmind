@@ -36,6 +36,8 @@ from .tracking import (
 )
 
 FEET = 0.65  # the ball sits this far in front of the player who has it
+# animation cues for the 3D figures
+CUE = {"kick": 1, "shoot": 2, "stab": 3, "slide": 4, "lunge": 5, "fall": 6, "dive_pos": 7, "dive_neg": 8, "block": 9}
 SEP = 1.1  # players keep at least this far apart
 LOFTED = {"long", "cross"}
 
@@ -57,6 +59,7 @@ def _unit(v: np.ndarray) -> np.ndarray:
 
 def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed: int = 0) -> Tracking:
     rng = np.random.default_rng(seed + 7919)
+    cue_rng = np.random.default_rng(seed + 31)  # animation choices never shift the match itself
     teams = {"home": home, "away": away}
     ids: list[str] = []
     sides: list[str] = []
@@ -173,6 +176,8 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
     ball_out = np.zeros((n, 2), dtype=np.float32)
     z_out = np.zeros(n, dtype=np.float32)
     owner_out = np.full(n, -1, dtype=np.int32)
+    cues: list[tuple[float, int, int]] = []
+    last_lunge: dict[int, float] = {}
 
     ball = np.array([PITCH_LENGTH / 2, PITCH_WIDTH / 2])
     ball_z = 0.0
@@ -226,6 +231,12 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             if typ == "period_start":
                 dead = True
                 continue
+            if typ == "foul" and j is not None and on[j]:
+                victim = col.get(e.get("victim") or "")
+                far = victim is None or np.hypot(*(pos[j] - pos[victim])) > 1.8
+                cues.append((t - 0.15, j, CUE["slide"] if far and cue_rng.random() < 0.5 else CUE["stab"]))
+                if victim is not None and on[victim]:
+                    cues.append((t, victim, CUE["fall"]))
             if typ in dead_types:
                 if typ != "goal":
                     fixes.append((e, "xy", f, "ball", None))
@@ -234,8 +245,10 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 continue
             if typ == "pressure":
                 if j is not None and on[j]:
-                    roles[j] = {"chase": owner, "to": None, "until": t + 1.2, "speed": "run"}
+                    roles[j] = {"chase": owner, "to": None, "until": t + 1.4, "speed": "sprint"}
                     fixes.append((e, "xy", f, "player", j))
+                    if owner >= 0 and np.hypot(*(pos[j] - pos[owner])) < 3.2:
+                        cues.append((t, j, CUE["lunge"]))
                 continue
             if j is None or not on[j]:
                 continue
@@ -251,6 +264,18 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             dead = False
             flight = None if typ in ("interception", "tackle", "save") else flight
             nxt = next_ball.get(id(e))
+            if typ == "tackle":
+                prev = owner
+                far = prev >= 0 and np.hypot(*(pos[j] - pos[prev])) > 1.7
+                cues.append((t - 0.2, j, CUE["slide"] if far else CUE["stab"]))
+                if prev >= 0 and cue_rng.random() < 0.3:
+                    cues.append((t + 0.05, prev, CUE["fall"]))
+            elif typ == "interception":
+                cues.append((t - 0.15, j, CUE["stab"]))
+            elif typ == "block":
+                cues.append((t - 0.1, j, CUE["block"]))
+            elif typ == "save":
+                cues.append((t - 0.25, j, CUE["dive_pos"] if ball[1] >= pos[j][1] else CUE["dive_neg"]))
             if typ in ("interception", "tackle", "save", "block"):
                 owner = j
                 pending = None
@@ -326,6 +351,7 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                     aim = np.array([e.get("end_x", gx + direction), e.get("end_y", GOAL_Y + 5)], dtype=float)
                     to, peak, dead_after = None, rng.uniform(0.5, 2.5), True
                 flight_end = t + float(np.clip(np.hypot(*(aim - ball)) / 25.0, 0.25, max(left, 0.3)))
+                cues.append((t - 0.12, j, CUE["shoot"]))
                 strike(e, t, to, aim, flight_end, peak, dead_after)
                 # the shot is where the shooter really was: keep xG consistent with that spot
                 ax = e["x"] if side_arr[j] else PITCH_LENGTH - e["x"]
@@ -361,6 +387,7 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                     aim, to, dead_after = intent, None, True
                 length = float(np.hypot(*(aim - ball)))
                 peak = min(13.0, 0.15 * length) if lofted else min(0.5, 0.02 * length)
+                cues.append((t - 0.1, j, CUE["kick"]))
                 strike(e, t, to, aim, arrive, peak, dead_after)
             pending = None
 
@@ -404,9 +431,20 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
                 goal_side = _unit(np.array([0.0 if defend_home else PITCH_LENGTH, GOAL_Y]) - ball)
                 first = cand[order[0]]
                 if d[order[0]] < 25:
-                    tgt[first] = ball + goal_side * 1.6
+                    carrier_v = vel[owner]
+                    if d[order[0]] > 3.5:
+                        # close him down at full speed
+                        tgt[first] = ball + goal_side * 1.6 + carrier_v * 0.4
+                        speed_cap[first] = float(min(vmax[first], 6.5 + 2.5 * press_at["home" if defend_home else "away"][f]))
+                    else:
+                        # jockey: stay goal-side, give a little ground, mirror his moves, and now and then
+                        # stick a foot in (most of these miss - the event script decides the real tackles)
+                        tgt[first] = ball + goal_side * 1.4 + carrier_v * 0.35
+                        speed_cap[first] = float(min(vmax[first], np.hypot(*carrier_v) + 2.0))
+                        if d[order[0]] < 2.4 and t - last_lunge.get(first, -9.0) > 4.0 and cue_rng.random() < 0.015:
+                            cues.append((t, first, CUE["lunge"]))
+                            last_lunge[first] = t
                     urgent[first] = True
-                    speed_cap[first] = float(min(vmax[first], 6.0 + 2.5 * press_at["home" if defend_home else "away"][f]))
                 pr = press_at["home" if defend_home else "away"][f]
                 if len(order) > 1 and pr > 0.6 and d[order[1]] < 16:
                     second = cand[order[1]]
@@ -496,4 +534,5 @@ def choreograph(events: list[dict], home: Team, away: Team, end_ts: float, seed:
             e["y"] = round(float(np.clip(e["y"], -1.0, PITCH_WIDTH + 1.0)), 2)
 
     vmax_out = (6.2 + 3.2 * pace_arr / 100).astype(np.float32)
-    return Tracking(ids, sides, xy, ball_out, z_out, owner_out, vmax_out)
+    cue_arr = np.array(sorted(cues), dtype=np.float32).reshape(-1, 3)
+    return Tracking(ids, sides, xy, ball_out, z_out, owner_out, vmax_out, cue_arr)

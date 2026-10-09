@@ -97,7 +97,8 @@ def generate(home: str, away: str, seed: int, script: list[TacticalChange] | Non
             xy = np.where(np.isnan(tracking.xy), -1, np.round(tracking.xy * 10)).astype(np.int16)
             ball = np.round(tracking.ball * 10).astype(np.int16)
             ball_z = np.round(tracking.ball_z * 10).astype(np.int16)
-            np.savez_compressed(folder / "tracking.npz", xy=xy, ball=ball, ball_z=ball_z,
+            cues = tracking.cues if tracking.cues is not None else np.zeros((0, 3), dtype=np.float32)
+            np.savez_compressed(folder / "tracking.npz", xy=xy, ball=ball, ball_z=ball_z, cues=cues,
                                 on_ball=tracking.on_ball.astype(np.int8), player_ids=np.array(tracking.player_ids),
                                 teams=np.array(tracking.teams))
     return pkg
@@ -169,4 +170,5 @@ def load_tracking(mid: str) -> dict:
     return {"xy": data["xy"], "ball": data["ball"],
             "ball_z": data["ball_z"] if "ball_z" in data else np.zeros(n, dtype=np.int16),
             "on_ball": data["on_ball"] if "on_ball" in data else np.full(n, -1, dtype=np.int8),
+            "cues": data["cues"] if "cues" in data else np.zeros((0, 3), dtype=np.float32),
             "player_ids": [str(p) for p in data["player_ids"]], "teams": [str(t) for t in data["teams"]]}

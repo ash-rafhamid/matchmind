@@ -653,6 +653,7 @@ export class Stadium {
     const bx = toX(bxp)
     const bz = toZ(byp)
     const teleport = Math.abs(dtMatch) > 1.5
+    const cues = this.store.activeCues(t)
     const P = this.parts
     for (let i = 0; i < this.bodies.length; i++) {
       const b = this.bodies[i]
@@ -691,7 +692,8 @@ export class Stadium {
       b.z = z
       b.has = true
 
-      let swing = Math.sin(b.phase) * 0.75 * b.amp
+      const sprint = Math.min(1, b.speed / 8)
+      let swing = Math.sin(b.phase) * (0.7 + 0.25 * sprint) * b.amp
       let bob = Math.abs(Math.cos(b.phase)) * 0.05 * b.amp
       const party = this.cheer !== null && this.cheer.side === b.side && t < this.cheer.until
       const wave = performance.now() / 1000
@@ -700,10 +702,82 @@ export class Stadium {
         bob = Math.abs(Math.sin(wave * 7 + i)) * 0.22
         swing *= 0.3
       }
-      const lean = party ? 0 : 0.16 * Math.min(1, b.speed / 8)
+      // running: legs and arms swing with the stride, more lean and bigger arms when sprinting
+      let legLr = swing
+      let legRr = -swing
+      let armLr = party ? -2.75 + 0.25 * Math.sin(wave * 9 + i) : -swing * (0.8 + 0.5 * sprint)
+      let armRr = party ? -2.75 + 0.25 * Math.cos(wave * 9 + i) : swing * (0.8 + 0.5 * sprint)
+      let pitch = party ? 0 : 0.24 * sprint
+      let roll = 0
+      let drop = 0
+      // football movements: kicks, tackles, slides, falls, dives
+      const act = cues.get(i)
+      if (act && !party) {
+        const u = act.u
+        const arc = Math.sin(Math.PI * u)
+        const hold = Math.max(0, Math.min(1, u / 0.22, (1 - u) / 0.25))
+        switch (act.kind) {
+          case 1: // pass: right leg swings through
+          case 2: {
+            // shot: a bigger swing, leaning back
+            const big = act.kind === 2 ? 1.35 : 1
+            legRr = (0.9 - 2.3 * u) * big
+            legLr = 0.15
+            pitch = -0.12 * big * arc
+            armLr = -0.7 * big * arc
+            armRr = 0.5 * big * arc
+            break
+          }
+          case 3: // stab tackle
+          case 5: {
+            // lunge at the ball
+            const k = act.kind === 3 ? 1 : 0.8
+            pitch = 0.45 * k * arc
+            legRr = -1.35 * k * arc
+            legLr = 0.35 * k * arc
+            drop = 0.14 * k * arc
+            armLr = -0.6 * arc
+            armRr = 0.7 * arc
+            break
+          }
+          case 4: // slide tackle: down on the hip, legs first
+            roll = (i % 2 ? 1 : -1) * 1.15 * hold
+            drop = 0.6 * hold
+            pitch = -0.35 * hold
+            legRr = -1.5 * hold
+            legLr = -1.15 * hold
+            armLr = 0.9 * hold
+            armRr = 0.5 * hold
+            break
+          case 6: // fouled: goes down, then gets up
+            pitch = 1.45 * Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
+            drop = 0.7 * Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
+            armLr = -1.7 * hold
+            armRr = -1.6 * hold
+            legLr = legRr = 0
+            break
+          case 7: // goalkeeper dive, towards +y or -y of the pitch
+          case 8: {
+            const toward = act.kind === 7 ? 1 : -1
+            roll = Math.sign(Math.sin(b.heading) || 1) * toward * 1.35 * hold
+            drop = -0.45 * arc
+            armLr = armRr = -2.9 * hold
+            legLr = 0.2 * hold
+            legRr = -0.2 * hold
+            break
+          }
+          case 9: // block: spread out, arms tucked
+            legLr = -0.55 * arc
+            legRr = 0.55 * arc
+            armLr = armRr = 0.15
+            pitch = 0.2 * arc
+            break
+        }
+      }
       tmpQ.setFromAxisAngle(UP, b.heading)
-      tmpB.compose(tmpV.set(x, bob * FIG, z), tmpQ, tmpS.setScalar(FIG))
-      tmpB.multiply(tmpM.makeRotationX(lean))
+      tmpB.compose(tmpV.set(x, (bob - drop) * FIG, z), tmpQ, tmpS.setScalar(FIG))
+      if (roll) tmpB.multiply(tmpM.makeRotationZ(roll))
+      tmpB.multiply(tmpM.makeRotationX(pitch))
       let slot = 0
       const at = (ox: number, oy: number, rotX: number) => {
         const m = POOL[slot++].makeTranslation(ox, oy, 0)
@@ -715,10 +789,10 @@ export class Stadium {
       const head = at(0, 1.74, 0)
       P.head.mesh.setMatrixAt(i, head)
       P.hair.mesh.setMatrixAt(i, head)
-      const legL = at(-0.11, 0.88, swing)
-      const legR = at(0.11, 0.88, -swing)
-      const armL = at(-0.3, 1.52, party ? -2.75 + 0.25 * Math.sin(wave * 9 + i) : -swing * 0.8)
-      const armR = at(0.3, 1.52, party ? -2.75 + 0.25 * Math.cos(wave * 9 + i) : swing * 0.8)
+      const legL = at(-0.11, 0.88, legLr)
+      const legR = at(0.11, 0.88, legRr)
+      const armL = at(-0.3, 1.52, armLr)
+      const armR = at(0.3, 1.52, armRr)
       for (const part of ['legs', 'socks', 'boots'] as const) {
         P[part].mesh.setMatrixAt(2 * i, legL)
         P[part].mesh.setMatrixAt(2 * i + 1, legR)
