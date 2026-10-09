@@ -42,7 +42,7 @@ export default function MatchView({ matchId }: { matchId: string }) {
 
 function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const clock = useMemo(() => new PlaybackClock(pkg.meta.duration_s), [pkg.meta.duration_s])
-  const store = useMemo(() => new TrackingStore(pkg.meta.id), [pkg.meta.id])
+  const store = useMemo(() => new TrackingStore(pkg.meta.id, pkg.meta.version), [pkg.meta.id, pkg.meta.version])
   const [highlight, setHighlight] = useState<number[]>([])
   const [tab, setTab] = useState<Tab>('live')
   const [cam, setCam] = useState<CameraMode>('director')

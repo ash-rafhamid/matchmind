@@ -61,7 +61,7 @@ export default function Home() {
 /** The front page is the product: a featured match playing live in the miniature stadium. */
 function Hero({ pkg }: { pkg: MatchPackage | null }) {
   const clock = useMemo(() => (pkg ? new PlaybackClock(pkg.meta.duration_s) : null), [pkg])
-  const store = useMemo(() => (pkg ? new TrackingStore(pkg.meta.id) : null), [pkg])
+  const store = useMemo(() => (pkg ? new TrackingStore(pkg.meta.id, pkg.meta.version) : null), [pkg])
   const t = useT()
 
   const [reel, setReel] = useState<ReelState | null>(null)

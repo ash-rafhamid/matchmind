@@ -69,7 +69,7 @@ async def cache_headers(request: Request, call_next):
         if path.startswith("/assets/"):
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         elif request.method == "GET" and path.startswith("/api/matches/") and (
-            path.count("/") == 3 or path.endswith("/tracking")
+            path.endswith("/tracking") and request.query_params.get("v")
         ):
             response.headers["Cache-Control"] = "public, max-age=86400"
         elif path in ("/", "/index.html"):
@@ -161,10 +161,21 @@ def matches() -> list[dict]:
     return store.list_matches()
 
 
+def _version(match_id: str) -> str:
+    """Changes whenever the match is regenerated; tracking URLs carry it so caches never serve stale data."""
+    return str(int((store.DATA_DIR / match_id / "events.json").stat().st_mtime))
+
+
 @app.get("/api/matches/{match_id}")
-def match(match_id: str) -> dict:
+def match(match_id: str, request: Request) -> Response:
     pkg = _load(match_id)
-    return {"meta": pkg["meta"], "analytics": pkg["analytics"], "events": pkg["events"]}
+    version = _version(match_id)
+    etag = f'"{match_id}-{version}"'
+    headers = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    body = {"meta": {**pkg["meta"], "version": version}, "analytics": pkg["analytics"], "events": pkg["events"]}
+    return Response(json.dumps(body, ensure_ascii=False, separators=(",", ":")), media_type="application/json", headers=headers)
 
 
 @app.get("/api/matches/{match_id}/tracking")
@@ -225,9 +236,9 @@ def _moment_or_404(pkg: dict, moment_id: str) -> dict:
 
 
 async def _moment_story(pkg: dict, moment: dict, persona: str, lang: str, client_key: str | None) -> dict:
-    key = _key("moment", pkg["meta"]["id"], moment["id"], persona, lang)
-    return await _cached_job(key, lambda: Job("moment", moment_packet(pkg, moment), persona, lang,
-                                              store.LEAGUE_ROSTER), client_key)
+    packet = moment_packet(pkg, moment)
+    key = _key("moment", pkg["meta"]["id"], moment["id"], persona, lang, cache.facts_digest(packet))
+    return await _cached_job(key, lambda: Job("moment", packet, persona, lang, store.LEAGUE_ROSTER), client_key)
 
 
 @app.get("/api/matches/{match_id}/moments/{moment_id}/story")
@@ -242,9 +253,9 @@ async def moment_story(match_id: str, moment_id: str, request: Request, persona:
 async def recap(match_id: str, request: Request, persona: str = "fan", lang: str = "en") -> dict:
     _check_audience(persona, lang)
     pkg = _load(match_id)
-    key = _key("recap", match_id, persona, lang)
-    return await _cached_job(key, lambda: Job("recap", recap_packet(pkg), persona, lang, store.LEAGUE_ROSTER),
-                             _client_key(request))
+    packet = recap_packet(pkg)
+    key = _key("recap", match_id, persona, lang, cache.facts_digest(packet))
+    return await _cached_job(key, lambda: Job("recap", packet, persona, lang, store.LEAGUE_ROSTER), _client_key(request))
 
 
 @app.get("/api/matches/{match_id}/live")
@@ -310,7 +321,7 @@ async def whatif(match_id: str, body: WhatIfBody, request: Request) -> dict:
         raise HTTPException(400, str(exc)) from None
     out: dict = {"result": result}
     if body.explain:
-        key = _key("whatif", match_id, json.dumps(body.model_dump(), sort_keys=True))
+        key = _key("whatif", match_id, _version(match_id), json.dumps(body.model_dump(), sort_keys=True))
         out["explanation"] = await _cached_job(
             key, lambda: Job("whatif", result, body.persona, body.lang, store.LEAGUE_ROSTER), _client_key(request))
     return out

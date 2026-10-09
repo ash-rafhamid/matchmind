@@ -237,6 +237,20 @@ export class Stadium {
     this.idleFrames = 0
   }
 
+  /** Debugging: draw the exact moment t once, whatever the visibility, with the camera settled. */
+  debugRender(t: number) {
+    this.clock.seek(t)
+    const f = this.store.frameAt(t)
+    for (let k = 0; k < 3; k++) {
+      if (f) this.place(f, t, k === 0 ? 0 : 0.1, 1)
+      this.lastCut = ''
+      this.updateCamera(t, f, 1)
+    }
+    this.composer.render()
+    this.labels.render(this.scene, this.camera)
+    return f ? { ball: [...f.ball], owner: f.owner >= 0 ? f.ids[f.owner] : null } : null
+  }
+
   dispose() {
     this.disposed = true
     cancelAnimationFrame(this.raf)

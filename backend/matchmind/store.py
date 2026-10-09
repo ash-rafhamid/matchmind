@@ -21,7 +21,8 @@ from .analytics.moments import detect_moments
 from .analytics.stats import momentum, pass_network, player_stats, team_stats, xg_timeline
 from .engine.league import Team, build_league
 from .engine.sim import MatchSimulator, TacticalChange
-from .engine.tracking import HZ, Tracking, build_tracking
+from .engine.choreo import choreograph
+from .engine.tracking import HZ, Tracking
 
 DATA_DIR = Path(os.environ.get("MATCHMIND_DATA", Path(__file__).resolve().parents[1] / "data" / "matches"))
 LEAGUE = build_league()
@@ -84,7 +85,7 @@ def generate(home: str, away: str, seed: int, script: list[TacticalChange] | Non
     meta = build_meta(sim, LEAGUE[home], LEAGUE[away], mid, title)
     if script:
         meta["script"] = [asdict(c) for c in script]
-    tracking = build_tracking(sim.events, LEAGUE[home], LEAGUE[away], sim.ts, seed=seed) if with_tracking else None
+    tracking = choreograph(sim.events, LEAGUE[home], LEAGUE[away], sim.ts, seed=seed) if with_tracking else None
     analytics = build_analytics(sim.events, meta, tracking)
     pkg = {"meta": meta, "events": sim.events, "analytics": analytics}
     if save:

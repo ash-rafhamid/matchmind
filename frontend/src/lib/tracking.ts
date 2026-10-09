@@ -56,17 +56,19 @@ function cr(p0: number, p1: number, p2: number, p3: number, t: number): number {
 export class TrackingStore {
   private chunks = new Map<number, Chunk | 'loading'>()
   private readonly matchId: string
+  private readonly version: string
   private out: Frame | null = null
 
-  constructor(matchId: string) {
+  constructor(matchId: string, version = '') {
     this.matchId = matchId
+    this.version = version
   }
 
   private ensure(idx: number) {
     if (idx < 0 || this.chunks.has(idx)) return
     this.chunks.set(idx, 'loading')
     api
-      .tracking(this.matchId, idx * CHUNK_SECONDS, CHUNK_SECONDS)
+      .tracking(this.matchId, idx * CHUNK_SECONDS, CHUNK_SECONDS, this.version)
       .then((c) => this.chunks.set(idx, decode(c)))
       .catch(() => this.chunks.delete(idx))
   }

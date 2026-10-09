@@ -42,6 +42,8 @@ export interface Meta {
   duration_s: number
   competition: string
   featured?: boolean
+  /** Changes whenever the match data is regenerated. */
+  version?: string
   tag?: string
   blurb?: string
 }

@@ -17,6 +17,11 @@ RUNTIME = store.DATA_DIR.parent / "cache"
 PRECOMPUTED = Path(__file__).resolve().parents[1] / "precomputed"
 
 
+def facts_digest(packet: dict) -> str:
+    """Fingerprint of the facts a story was written from: if the facts change, the old story is never served."""
+    return hashlib.sha1(json.dumps(packet, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()[:12]
+
+
 def make_key(provider: str, model: str | None, *parts: object) -> str:
     raw = "|".join(str(p) for p in parts) + f"|{provider}|{model}"
     return hashlib.sha1(raw.encode()).hexdigest()[:20]

@@ -35,9 +35,10 @@ export const api = {
   health: () => call<Health>('/api/health'),
   options: () => call<Options>('/api/options'),
   matches: () => call<MatchSummary[]>('/api/matches'),
-  match: (id: string) => call<MatchPackage>(`/api/matches/${id}`),
-  tracking: (id: string, start: number, seconds: number) =>
-    call<TrackingChunk>(`/api/matches/${id}/tracking?start=${start}&seconds=${seconds}&hz=10&enc=delta`),
+  // ?rev bumps the address past any copy browsers cached under the old 24-hour rule
+  match: (id: string) => call<MatchPackage>(`/api/matches/${id}?rev=2`),
+  tracking: (id: string, start: number, seconds: number, version = '') =>
+    call<TrackingChunk>(`/api/matches/${id}/tracking?start=${start}&seconds=${seconds}&hz=10&enc=delta&v=${version}`),
   story: (id: string, momentId: string, persona: string, lang: string) =>
     call<CrewResult>(`/api/matches/${id}/moments/${momentId}/story?persona=${persona}&lang=${lang}`),
   recap: (id: string, persona: string, lang: string) =>

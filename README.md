@@ -20,7 +20,7 @@ viewer gets a verified template instead. Nothing unverified reaches the screen.
 
 | Feature | What you see | How it works |
 |---|---|---|
-| **Matchday Miniature** | Every match plays in a living 3D tabletop stadium: kitted footballers whose strides match their real speed, a ball that flies in arcs, a crowd that celebrates, AR pass/shot arcs and name/speed tags drawn into the scene | three.js (instanced figures, tilt-shift focused on the ball), driven by the event-anchored 10 Hz tracking; adaptive quality and off-screen pausing keep it smooth |
+| **Matchday Miniature** | Every match plays in a living 3D tabletop stadium: kitted footballers whose strides match their real speed, a ball that flies in arcs, a crowd that celebrates, AR pass/shot arcs and name/speed tags drawn into the scene | three.js (instanced figures, tilt-shift focused on the ball), driven by the choreographer's 10 Hz tracking; adaptive quality, buffering and off-screen pausing keep it smooth |
 | **AI director** | The camera cuts to the goal for big chances, circles the scorer after a goal, follows play like TV - or pick TV, Tactical, Goal cam, Follow | Shot and goal events drive camera "shots"; broadcast graphics (score bug, lower thirds, GOAL takeover) react to the same events |
 | **Live crew** | Key moments appear as the replay runs, with clickable `▶ 37'` evidence chips that replay the build-up in 3D | Moment detector -> Agent Framework workflow (Analyst ∥ Tactician -> Storyteller -> Fact-checker loop) |
 | **10 languages, whole site** | One "Commentary" button switches the interface (incl. right-to-left Arabic) and every story, answer and report | Interface strings translated by the Foundry model (`scripts/translate_ui.py`); commentary pre-written and verified in every language for the featured matches |
@@ -82,8 +82,13 @@ No dataset is provided by the hackathon, so MatchMind generates its own - and th
   shots with probabilities shaped by location, opponent pressure, both teams' DNA and player skill. It produces
   turnovers, set pieces, fouls, cards, penalties, substitutions, and coaches who react to the score ("chasing the
   game", "protecting the lead"). ~40 ms per match.
-- **Tracking** (`engine/tracking.py`): 10 Hz positions for 22 players and the ball, from a team-shape model with
-  lagged ball perception, pressing runs, receivers running onto passes, and pace/acceleration limits.
+- **Choreographer** (`engine/choreo.py`): plays the event script out as continuous football at 10 Hz. The player on
+  the ball keeps moving with it; passes are struck at real ball speeds (median ~14 m/s) and aimed where the receiver
+  will be, and he runs onto them; the nearest defender presses the carrier, interceptors step into the passing lane,
+  tacklers chase the dribbler, goalkeepers stay between ball and goal; everyone runs with speed and acceleration limits
+  and keeps personal space. Event positions are then rewritten from what actually happened, so stats, AI commentary
+  and the 3D replay describe the same match. `scripts/motion_check.py` measures it (ball speeds, receivers on the
+  ball, time spent standing/jogging/sprinting, spacing).
 - **Calibrated against real top-flight averages** (`scripts/calibrate.py`, 400 matches):
 
 | Per team per match | MatchMind | Real top flight |

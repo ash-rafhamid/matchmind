@@ -63,10 +63,13 @@ async def main(langs: list[str]) -> None:
         for lang in langs:
             for persona in [p for p in PERSONAS if p in os.environ.get("PERSONAS", ",".join(PERSONAS)).split(",")]:
                 for m in pkg["analytics"]["moments"]:
-                    key = cache.make_key(model.provider, model.model, "moment", mid, m["id"], persona, lang)
-                    tasks.append(one(key, Job("moment", moment_packet(pkg, m), persona, lang, store.LEAGUE_ROSTER)))
-                key = cache.make_key(model.provider, model.model, "recap", mid, persona, lang)
-                tasks.append(one(key, Job("recap", recap_packet(pkg), persona, lang, store.LEAGUE_ROSTER)))
+                    packet = moment_packet(pkg, m)
+                    key = cache.make_key(model.provider, model.model, "moment", mid, m["id"], persona, lang,
+                                         cache.facts_digest(packet))
+                    tasks.append(one(key, Job("moment", packet, persona, lang, store.LEAGUE_ROSTER)))
+                packet = recap_packet(pkg)
+                key = cache.make_key(model.provider, model.model, "recap", mid, persona, lang, cache.facts_digest(packet))
+                tasks.append(one(key, Job("recap", packet, persona, lang, store.LEAGUE_ROSTER)))
 
     t0 = time.perf_counter()
     print(f"{len(tasks)} jobs on {model.provider} / {model.model}")
