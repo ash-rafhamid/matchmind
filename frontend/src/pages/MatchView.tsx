@@ -1,4 +1,3 @@
-import { BarChart3, Download, FlaskConical, Loader2, MessageCircleQuestion, Newspaper, Radio, Tv, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
@@ -9,16 +8,18 @@ import Scoreboard from '../components/Scoreboard'
 import StatsPanel from '../components/StatsPanel'
 import Timeline from '../components/Timeline'
 import WhatIfPanel from '../components/WhatIfPanel'
-import { PlaybackClock } from '../lib/clock'
-import { MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
+import { PlaybackClock, useClock } from '../lib/clock'
+import { lastEventIndex, MatchCtx, type MatchCtxValue, useMatch } from '../lib/match'
+import { TrackingStore } from '../lib/tracking'
+import { ROMAN, surname } from '../lib/ui'
 import type { MatchPackage, Side } from '../types'
 
 const TABS = [
-  ['live', 'Live crew', Radio],
-  ['ask', 'Ask', MessageCircleQuestion],
-  ['whatif', 'What-if lab', FlaskConical],
-  ['stats', 'Stats', BarChart3],
-  ['recap', 'Recap', Newspaper],
+  ['live', 'Live'],
+  ['ask', 'Ask'],
+  ['whatif', 'What if'],
+  ['stats', 'Numbers'],
+  ['recap', 'Report'],
 ] as const
 
 type Tab = (typeof TABS)[number][0]
@@ -31,23 +32,20 @@ export default function MatchView({ matchId }: { matchId: string }) {
     api.match(matchId).then(setPkg).catch((e) => setError(String(e.message ?? e)))
   }, [matchId])
 
-  if (error) return <div className="panel mt-6 p-6 text-rose-400">Could not load match: {error}</div>
-  if (!pkg)
-    return (
-      <div className="mt-10 flex items-center justify-center gap-2 text-ink-400">
-        <Loader2 className="animate-spin" size={18} /> Loading match...
-      </div>
-    )
+  if (error) return <p className="py-16 text-center text-signal">This match could not be found: {error}</p>
+  if (!pkg) return <p className="typing py-16 text-center text-ink-3 italic">Setting the match in type</p>
   return <LoadedMatch pkg={pkg} />
 }
 
 function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const clock = useMemo(() => new PlaybackClock(pkg.meta.duration_s), [pkg.meta.duration_s])
+  const store = useMemo(() => new TrackingStore(pkg.meta.id), [pkg.meta.id])
   const [highlight, setHighlight] = useState<number[]>([])
   const [tab, setTab] = useState<Tab>('live')
   const eventsById = useMemo(() => new Map(pkg.events.map((e) => [e.id, e])), [pkg.events])
 
   useEffect(() => () => clock.destroy(), [clock])
+  useEffect(() => store.prefetch(0), [store])
 
   const focusEvidence = useCallback(
     (ids: number[], play = false) => {
@@ -56,10 +54,11 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
       setHighlight(ids)
       const first = Math.min(...evs.map((e) => e!.ts))
       const last = Math.max(...evs.map((e) => e!.ts + e!.dur))
-      if (play) clock.replay(Math.max(0, first - 2), last + 2, 1)
+      store.prefetch(first - 3)
+      if (play) clock.replay(Math.max(0, first - 3), last + 2, 1)
       else clock.seek(Math.max(0, first - 1))
     },
-    [clock, eventsById],
+    [clock, eventsById, store],
   )
 
   const value: MatchCtxValue = useMemo(
@@ -78,98 +77,151 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
 
   return (
     <MatchCtx.Provider value={value}>
-      <div className="grid gap-4 pt-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(380px,1fr)]">
-        <section className="panel space-y-3 p-3 sm:p-4">
-          <Scoreboard />
-          <div className="relative">
-            <Pitch />
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-4 num text-[11px] text-ink-3 uppercase">
+        <a href="#/" className="link">
+          &larr; All fixtures
+        </a>
+        <span>
+          {pkg.meta.competition} · seed {pkg.meta.seed}
+        </span>
+        <span className="flex gap-4">
+          <a href={`#/studio/${pkg.meta.id}`} target="_blank" rel="noreferrer" className="link">
+            Studio overlay &#8599;
+          </a>
+          <a href={`/api/matches/${pkg.meta.id}/export.zip`} className="link">
+            Dataset &darr;
+          </a>
+        </span>
+      </div>
+      <Scoreboard />
+      <div className="double-rule" />
+
+      <div className="grid gap-8 pt-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(400px,1fr)] xl:gap-10">
+        <section className="min-w-0">
+          <figure className="plate">
+            <span className="crop-b" />
+            <Pitch store={store} />
             {highlight.length > 0 && (
-              <button
-                onClick={() => setHighlight([])}
-                className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs text-ink-100 hover:bg-ink-800"
-              >
-                <X size={12} /> Clear highlight ({highlight.length} events)
+              <button onClick={() => setHighlight([])} className="link absolute top-5 right-5 bg-paper px-2 py-1">
+                Clear {highlight.length} annotation{highlight.length > 1 ? 's' : ''} &times;
               </button>
             )}
+          </figure>
+          <Transport />
+          <div className="mt-5">
+            <Timeline />
           </div>
-          <Timeline />
-          <TeamStrip />
+          <p className="mt-4 border-t border-rule pt-2 text-[13px] text-ink-3 italic">
+            <span className="not-italic label mr-2">Fig. 1</span>
+            Reconstruction from 10 Hz synthetic tracking. The ball lifts off its shadow when it is in the air; tails show
+            the last 0.6 s of each run; the dashed line is the pass being played. Hover a player for their name.
+          </p>
+          <TeamSheets />
         </section>
 
-        <section className="panel flex min-h-[560px] flex-col p-3 sm:p-4 xl:h-[calc(100vh-110px)] xl:sticky xl:top-[84px]">
-          <nav className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-ink-700 bg-ink-900 p-1" role="tablist">
-            {TABS.map(([id, label, Icon]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => setTab(id)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-semibold whitespace-nowrap ${
-                  tab === id ? 'bg-ink-600 text-ink-100' : 'text-ink-400 hover:text-ink-100'
-                }`}
-              >
-                <Icon size={14} /> {label}
+        <aside className="flex min-h-[620px] min-w-0 flex-col xl:sticky xl:top-4 xl:h-[calc(100vh-32px)]">
+          <nav className="flex gap-5 overflow-x-auto border-b border-ink" role="tablist" aria-label="Match sections">
+            {TABS.map(([id, label], i) => (
+              <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className="tab">
+                <span className="roman">{ROMAN[i]}.</span>
+                {label}
               </button>
             ))}
           </nav>
-          <div className="min-h-0 flex-1">
+          <div className="min-h-0 flex-1 pt-4">
             {tab === 'live' && <CrewFeed />}
             {tab === 'ask' && <AskPanel />}
             {tab === 'whatif' && <WhatIfPanel />}
             {tab === 'stats' && <StatsPanel />}
             {tab === 'recap' && <RecapPanel />}
           </div>
-        </section>
+        </aside>
       </div>
     </MatchCtx.Provider>
   )
 }
 
-function TeamStrip() {
-  const { pkg } = useMatch()
+const SPEEDS = [1, 4, 8, 16, 32]
+const ACTION: Record<string, string> = {
+  pass: 'Pass', carry: 'Carry', shot: 'Shot', interception: 'Interception', tackle: 'Tackle', save: 'Save',
+  clearance: 'Clearance', block: 'Block', foul: 'Foul', card: 'Card', offside: 'Offside', goal: 'Goal',
+}
+
+function Transport() {
+  const { pkg, clock, name } = useMatch()
+  const { time, playing, speed } = useClock(clock, 6)
+  const shown = useMemo(() => pkg.events.filter((e) => e.type in ACTION), [pkg.events])
+  const idx = lastEventIndex(shown, time)
+  const cur = idx >= 0 && time - shown[idx].ts < 3 ? shown[idx] : null
+  const caption = cur
+    ? `${ACTION[cur.type]} · ${surname(name(cur.player))}${cur.receiver ? ` → ${surname(name(cur.receiver))}` : ''}${
+        cur.outcome && !['complete', 'success'].includes(cur.outcome) ? ` (${cur.outcome.replace('_', ' ')})` : ''
+      }`
+    : null
+
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2 text-xs">
-        <a
-          href={`#/studio/${pkg.meta.id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 hover:border-mint-500/60"
-        >
-          <Tv size={14} className="text-mint-400" /> Studio overlay (live feed)
-        </a>
-        <a
-          href={`/api/matches/${pkg.meta.id}/export.zip`}
-          className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-900 px-3 py-1.5 hover:border-mint-500/60"
-        >
-          <Download size={14} className="text-mint-400" /> Download dataset (events + 10 Hz tracking)
-        </a>
+    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 border-y border-rule py-3">
+      <button className="btn btn-solid min-w-[108px] justify-center" onClick={() => clock.toggle()} aria-label={playing ? 'Pause' : 'Play'}>
+        {playing ? '❚❚ Pause' : '▶ Play'}
+      </button>
+      <button className="link" onClick={() => clock.seek(0)}>
+        ↺ Kick-off
+      </button>
+      <div className="flex items-center gap-1" role="group" aria-label="Playback speed">
+        <span className="label mr-1">Speed</span>
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            onClick={() => clock.setSpeed(s)}
+            aria-pressed={speed === s}
+            className={`num px-1.5 py-0.5 text-[13px] ${speed === s ? 'bg-ink text-paper' : 'text-ink-3 hover:text-ink'}`}
+          >
+            ×{s}
+          </button>
+        ))}
       </div>
-      <TeamCards />
+      <div className="ml-auto min-h-[1.5em] text-right text-[15px] text-ink-2 italic" aria-live="off">
+        {caption}
+      </div>
     </div>
   )
 }
 
-function TeamCards() {
+function TeamSheets() {
   const { pkg } = useMatch()
   return (
-    <div className="grid gap-3 text-xs sm:grid-cols-2">
-      {(['home', 'away'] as Side[]).map((s) => {
-        const t = pkg.meta.teams[s]
-        return (
-          <div key={s} className="rounded-xl border border-ink-700 bg-ink-900/50 p-3">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full" style={{ background: t.primary, boxShadow: `0 0 0 2px ${t.secondary}` }} />
-              <span className="font-semibold">{t.name}</span>
-              <span className="text-ink-400">
-                {t.dna.formation} · coach {t.coach}
-              </span>
+    <section className="mt-8">
+      <div className="label label-ink">Team sheets</div>
+      <div className="mt-3 grid gap-8 border-t border-ink pt-4 sm:grid-cols-2">
+        {(['home', 'away'] as Side[]).map((s) => {
+          const t = pkg.meta.teams[s]
+          const byId = new Map(t.players.map((p) => [p.id, p]))
+          return (
+            <div key={s}>
+              <div className="display text-[20px] font-semibold">{t.name}</div>
+              <p className="mt-1 text-[14px] text-ink-3 italic">
+                {t.dna.formation} under {t.coach}
+                {t.traits.length ? ` - ${t.traits.join(', ')}` : ''}.
+              </p>
+              <ol className="mt-3 columns-2 gap-6 text-[14px]">
+                {t.starters.map((pid) => {
+                  const p = byId.get(pid)
+                  return (
+                    <li key={pid} className="flex gap-2 py-0.5">
+                      <span className="num w-6 text-right text-ink-3">{p?.number}</span>
+                      <span className="truncate">{p?.name}</span>
+                    </li>
+                  )
+                })}
+              </ol>
+              <p className="mt-2 text-[13px] text-ink-3">
+                <span className="label mr-1">Subs</span>
+                {t.bench.map((pid) => byId.get(pid)?.name).filter(Boolean).join(', ')}
+              </p>
             </div>
-            <div className="mt-1.5 text-ink-400">{t.traits.join(' · ') || 'balanced'}</div>
-          </div>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
-

@@ -1,19 +1,7 @@
-import { FlaskConical, Loader2, PlayCircle, ShieldCheck, Sparkles, Workflow } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useSettings } from '../lib/settings'
 import type { MatchSummary } from '../types'
-
-function Crest({ color, accent, label }: { color: string; accent: string; label: string }) {
-  return (
-    <div
-      className="grid h-12 w-12 place-items-center rounded-xl font-display text-lg font-bold shadow-lg"
-      style={{ background: color, color: accent, boxShadow: `0 0 0 2px ${accent}33` }}
-    >
-      {label}
-    </div>
-  )
-}
 
 export default function Home({ onOpen }: { onOpen: (id: string) => void }) {
   const [matches, setMatches] = useState<MatchSummary[] | null>(null)
@@ -24,82 +12,41 @@ export default function Home({ onOpen }: { onOpen: (id: string) => void }) {
   }, [])
 
   return (
-    <div className="space-y-8 pt-6">
-      <section className="grid items-center gap-6 lg:grid-cols-[1.25fr_1fr]">
-        <div className="animate-rise">
-          <h1 className="font-display text-4xl leading-tight font-semibold sm:text-5xl">
-            Every match, explained.
+    <div>
+      <section className="grid gap-10 border-b border-rule py-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
+        <div className="rise">
+          <div className="label text-signal">The lead</div>
+          <h1 className="display mt-3 text-[44px] leading-[0.98] font-semibold sm:text-[68px]">
+            Every match, <span className="italic-wonk font-normal">explained.</span>
             <br />
-            <span className="text-mint-400">Every decision, simulated.</span>
+            Every decision, <span className="italic-wonk font-normal">simulated.</span>
           </h1>
-          <p className="mt-4 max-w-2xl text-ink-300">
-            MatchMind is a crew of AI agents that watches a football match, explains <em>why</em> each key moment
-            happened, writes it for the fan in front of it - in their language, at their level, even as audio
-            description - and answers <em>what if</em> by re-simulating the rest of the match hundreds of times.
-            Every number it says is checked against the data before you see it.
+          <p className="body-copy mt-6 max-w-[60ch] text-[18px]">
+            MatchMind is a crew of AI agents that watches a football match, works out <em>why</em> each key moment
+            happened, and writes it for the reader in front of it: a casual fan, an analyst, an eight-year-old, a coach,
+            or someone listening to audio description, in ten languages. Ask it anything. Ask it <em>what if</em>, and it
+            replays the rest of the match hundreds of times to find out.
           </p>
-          <div className="mt-5 flex flex-wrap gap-2 text-xs">
-            {[
-              [Workflow, 'Multi-agent workflow (Agent Framework)'],
-              [ShieldCheck, 'Deterministic fact-checking'],
-              [FlaskConical, 'Monte Carlo what-if lab'],
-              [Sparkles, '5 audiences x 10 languages'],
-            ].map(([Icon, label]) => {
-              const I = Icon as typeof Workflow
-              return (
-                <span key={label as string} className="flex items-center gap-1.5 rounded-full border border-ink-700 bg-ink-850 px-3 py-1.5 text-ink-300">
-                  <I size={14} className="text-mint-400" /> {label as string}
-                </span>
-              )
-            })}
-          </div>
+          <p className="mt-4 max-w-[60ch] text-[15px] text-ink-3 italic">
+            Nothing reaches the page unchecked: every number, name, minute and scoreline is verified against the match
+            data by deterministic code before you see it.
+          </p>
         </div>
         <CrewDiagram />
       </section>
 
-      <section>
-        <div className="mb-3 flex items-end justify-between">
-          <h2 className="font-display text-2xl font-semibold tracking-wide">Matchday</h2>
-          <span className="text-xs text-ink-400">Synthetic matches from our calibrated simulator</span>
+      <section className="py-10">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="display text-[32px] font-semibold">Today's fixtures</h2>
+          <span className="label">Synthetic matches from a calibrated simulator · 10 Hz tracking</span>
         </div>
-        {error && <div className="panel p-4 text-rose-400">Could not reach the API: {error}</div>}
-        {!matches && !error && (
-          <div className="flex items-center gap-2 text-ink-400">
-            <Loader2 className="animate-spin" size={16} /> Loading fixtures...
-          </div>
-        )}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {error && <p className="mt-6 text-signal">The press room is unreachable: {error}</p>}
+        {!matches && !error && <p className="mt-6 text-ink-3 italic typing">Setting the type</p>}
+        <ol className="mt-4 border-t-2 border-ink">
           {matches?.map((m, i) => (
-            <button
-              key={m.id}
-              onClick={() => onOpen(m.id)}
-              className="panel group animate-rise p-5 text-left transition hover:-translate-y-0.5 hover:border-mint-500/60"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <div className="flex items-center justify-between text-[11px] tracking-wider text-ink-400 uppercase">
-                <span>{m.competition}</span>
-                {m.featured && <span className="rounded-full bg-mint-500/15 px-2 py-0.5 text-mint-400">Featured</span>}
-              </div>
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <Crest color={m.home.primary} accent={m.home.secondary} label={m.home.short} />
-                  <div className="truncate font-medium">{m.home.name}</div>
-                </div>
-                <div className="font-display text-3xl font-bold tabular-nums">
-                  {m.score.home}<span className="px-1 text-ink-400">-</span>{m.score.away}
-                </div>
-                <div className="flex min-w-0 items-center justify-end gap-3">
-                  <div className="truncate text-right font-medium">{m.away.name}</div>
-                  <Crest color={m.away.primary} accent={m.away.secondary} label={m.away.short} />
-                </div>
-              </div>
-              {m.blurb && <p className="mt-4 text-sm text-ink-300">{m.blurb}</p>}
-              <div className="mt-4 flex items-center gap-1.5 text-sm font-medium text-mint-400 opacity-80 group-hover:opacity-100">
-                <PlayCircle size={16} /> Watch with the crew
-              </div>
-            </button>
+            <Fixture key={m.id} m={m} i={i} onOpen={onOpen} />
           ))}
-        </div>
+        </ol>
       </section>
 
       <ScenarioLab onOpen={onOpen} />
@@ -107,52 +54,111 @@ export default function Home({ onOpen }: { onOpen: (id: string) => void }) {
   )
 }
 
-function CrewDiagram() {
-  const steps = [
-    ['Producer', 'frames the moment', 'text-ink-300'],
-    ['Analyst', 'picks the numbers', 'text-sky-400'],
-    ['Tactician', 'explains why', 'text-sky-400'],
-    ['Storyteller', 'writes for you', 'text-mint-400'],
-    ['Fact-checker', 'verifies every claim', 'text-amber-400'],
-  ]
+function Fixture({ m, i, onOpen }: { m: MatchSummary; i: number; onOpen: (id: string) => void }) {
   return (
-    <div className="panel animate-rise p-5" style={{ animationDelay: '120ms' }}>
-      <div className="mb-3 text-xs tracking-wider text-ink-400 uppercase">How the crew works</div>
-      <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 text-center text-xs">
-        <Box {...{ name: steps[0][0], role: steps[0][1], color: steps[0][2] }} />
-        <Arrow />
-        <div className="space-y-2">
-          <Box name={steps[1][0]} role={steps[1][1]} color={steps[1][2]} />
-          <Box name={steps[2][0]} role={steps[2][1]} color={steps[2][2]} />
+    <li className="rise border-b border-rule" style={{ animationDelay: `${i * 80}ms` }}>
+      <button
+        onClick={() => onOpen(m.id)}
+        className="group grid w-full grid-cols-[1fr_auto_1fr] items-center gap-x-4 gap-y-2 px-1 py-7 text-left transition-colors hover:bg-paper-2 sm:gap-x-10 sm:px-4"
+      >
+        <div className="col-span-3 flex items-center justify-between">
+          <span className="num text-[11px] text-ink-3">No. {String(i + 1).padStart(2, '0')}</span>
+          <span className="label">{m.featured ? 'Featured · ' : ''}{m.competition}</span>
         </div>
-        <Arrow />
-        <div className="space-y-2">
-          <Box name={steps[3][0]} role={steps[3][1]} color={steps[3][2]} />
-          <Box name={steps[4][0]} role={steps[4][1]} color={steps[4][2]} />
+        <TeamName team={m.home} align="right" />
+        <div className="display text-center text-[52px] leading-none font-semibold tabular-nums sm:text-[76px]">
+          {m.score.home}
+          <span className="px-2 text-ink-4 sm:px-3">–</span>
+          {m.score.away}
         </div>
+        <TeamName team={m.away} align="left" />
+        <div className="col-span-3 mt-2 flex flex-wrap items-baseline justify-between gap-3">
+          {m.blurb ? <p className="max-w-[70ch] text-[16px] text-ink-2 italic">{m.blurb}</p> : <span />}
+          <span className="link group-hover:text-signal">Read the match &rarr;</span>
+        </div>
+      </button>
+    </li>
+  )
+}
+
+function TeamName({ team, align }: { team: MatchSummary['home']; align: 'left' | 'right' }) {
+  return (
+    <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+      <div className={`flex items-center gap-3 ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
+        {align === 'left' && <Swatch team={team} />}
+        <span className="display truncate text-[22px] leading-tight font-semibold sm:text-[34px]">{team.name}</span>
+        {align === 'right' && <Swatch team={team} />}
       </div>
-      <p className="mt-4 text-xs text-ink-400">
-        Analyst and Tactician run in parallel. A draft that cites any number, name, minute or event not in the data is
-        sent back with the exact problems - and never reaches the viewer. Questions go to a Host agent that queries the
-        match through MCP tools and can run what-if simulations.
-      </p>
     </div>
   )
 }
 
-function Box({ name, role, color }: { name: string; role: string; color: string }) {
+function Swatch({ team }: { team: { primary: string; secondary: string } }) {
   return (
-    <div className="rounded-xl border border-ink-700 bg-ink-900 px-2 py-2">
-      <div className={`font-semibold ${color}`}>{name}</div>
-      <div className="text-[10px] text-ink-400">{role}</div>
-    </div>
+    <span className="inline-flex h-5 w-5 shrink-0 border border-ink" aria-hidden>
+      <span className="h-full w-1/2" style={{ background: team.primary }} />
+      <span className="h-full w-1/2" style={{ background: team.secondary }} />
+    </span>
   )
 }
 
-function Arrow() {
-  return <div className="text-ink-600">&rarr;</div>
+/** "How the crew works" drawn as an editorial infographic. */
+function CrewDiagram() {
+  const box = (x: number, y: number, w: number, title: string, sub: string, accent = false) => (
+    <g>
+      <rect x={x} y={y} width={w} height={46} fill={accent ? '#141310' : '#f2eee3'} stroke="#141310" strokeWidth="1.2" />
+      <text x={x + w / 2} y={y + 20} textAnchor="middle" className="svg-cond" fill={accent ? '#f2eee3' : '#141310'}>
+        {title}
+      </text>
+      <text x={x + w / 2} y={y + 36} textAnchor="middle" className="svg-ital" fill={accent ? '#e1d9c6' : '#77705f'}>
+        {sub}
+      </text>
+    </g>
+  )
+  const arrow = (d: string, dashed = false, color = '#141310') => (
+    <path d={d} fill="none" stroke={color} strokeWidth="1.2" strokeDasharray={dashed ? '4 3' : undefined} markerEnd={`url(#arr-${color === '#141310' ? 'ink' : 'sig'})`} />
+  )
+  return (
+    <figure className="rise self-start" style={{ animationDelay: '120ms' }}>
+      <div className="label">Fig. A — The crew, in order of play</div>
+      <svg viewBox="0 0 520 300" className="mt-3 w-full" role="img" aria-label="Producer briefs the Analyst and Tactician in parallel; the Storyteller writes; a code fact-checker sends drafts back until they are verified.">
+        <style>{`.svg-cond{font:600 13px 'Barlow Condensed',sans-serif;letter-spacing:.12em;text-transform:uppercase}.svg-ital{font:italic 12px 'Fraunces Variable',serif}.svg-mono{font:500 10px 'JetBrains Mono Variable',monospace}`}</style>
+        <defs>
+          <marker id="arr-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#141310" />
+          </marker>
+          <marker id="arr-sig" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#e3361b" />
+          </marker>
+        </defs>
+        {box(4, 107, 96, 'Producer', 'frames it')}
+        {box(140, 40, 110, 'Analyst', 'the numbers')}
+        {box(140, 174, 110, 'Tactician', 'the why')}
+        {box(290, 107, 110, 'Storyteller', 'writes for you')}
+        {box(290, 236, 110, 'Fact-checker', 'pure code', true)}
+        {arrow('M100,122 C120,122 120,63 138,63')}
+        {arrow('M100,138 C120,138 120,197 138,197')}
+        {arrow('M250,63 C270,63 270,122 288,122')}
+        {arrow('M250,197 C270,197 270,138 288,138')}
+        {arrow('M345,153 L345,234')}
+        {arrow('M290,262 C262,262 262,168 288,146', true, '#e3361b')}
+        <text x="254" y="284" textAnchor="end" className="svg-ital" fill="#e3361b">rejected drafts go back, with reasons</text>
+        {arrow('M400,259 L438,259')}
+        <text x="444" y="254" className="svg-cond" fill="#141310">You</text>
+        <text x="444" y="270" className="svg-mono" fill="#1d6a46">✓ verified</text>
+        <text x="140" y="22" className="svg-mono" fill="#77705f">IN PARALLEL · MICROSOFT AGENT FRAMEWORK</text>
+        <text x="410" y="124" className="svg-mono" fill="#77705f">5 audiences</text>
+        <text x="410" y="138" className="svg-mono" fill="#77705f">10 languages</text>
+      </svg>
+      <figcaption className="mt-2 border-t border-rule pt-2 text-[14px] text-ink-3 italic">
+        Questions go to a Host agent that queries the match through MCP tools, consults the Tactician and can run what-if
+        simulations; its answers are checked by the same code.
+      </figcaption>
+    </figure>
+  )
 }
 
+/** Build-your-own fixture, written as a sentence. */
 function ScenarioLab({ onOpen }: { onOpen: (id: string) => void }) {
   const { options } = useSettings()
   const teams = options ? Object.entries(options.teams) : []
@@ -164,6 +170,8 @@ function ScenarioLab({ onOpen }: { onOpen: (id: string) => void }) {
   const [formation, setFormation] = useState('3-4-3')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const homeTeam = options?.teams[home]
+  const awayTeam = options?.teams[away]
 
   const create = async () => {
     setBusy(true)
@@ -181,67 +189,80 @@ function ScenarioLab({ onOpen }: { onOpen: (id: string) => void }) {
     }
   }
 
-  return (
-    <section className="panel p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <FlaskConical className="text-mint-400" size={18} />
-        <h2 className="font-display text-2xl font-semibold tracking-wide">Scenario lab</h2>
-        <span className="text-xs text-ink-400">Generate a brand-new synthetic match - events, 10 Hz tracking and analytics in ~10 s</span>
-      </div>
-      <div className="mt-4 flex flex-wrap items-end gap-4 text-sm">
-        <TeamSelect label="Home" value={home} onChange={setHome} teams={teams} />
-        <TeamSelect label="Away" value={away} onChange={setAway} teams={teams} />
-        <label className="flex items-center gap-2">
-          <input type="checkbox" checked={switchOn} onChange={(e) => setSwitchOn(e.target.checked)} />
-          Home tactical switch
-        </label>
-        {switchOn && (
-          <>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-400">at minute {minute}</span>
-              <input type="range" min={10} max={85} value={minute} onChange={(e) => setMinute(+e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-400">press {press.toFixed(2)}</span>
-              <input type="range" min={0} max={1} step={0.05} value={press} onChange={(e) => setPress(+e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-400">formation</span>
-              <select value={formation} onChange={(e) => setFormation(e.target.value)} className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1">
-                {(options?.formations ?? []).map((f) => (
-                  <option key={f}>{f}</option>
-                ))}
-              </select>
-            </label>
-          </>
-        )}
-        <button
-          onClick={create}
-          disabled={busy || home === away}
-          className="ml-auto flex items-center gap-2 rounded-xl bg-mint-500 px-4 py-2 font-semibold text-ink-950 transition hover:bg-mint-400 disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
-          {busy ? 'Simulating...' : 'Generate match'}
-        </button>
-      </div>
-      {error && <div className="mt-3 text-sm text-rose-400">{error}</div>}
-    </section>
-  )
-}
+  const pressWord = press >= 0.8 ? 'ferociously' : press >= 0.6 ? 'hard' : press >= 0.4 ? 'moderately' : 'barely'
 
-function TeamSelect({ label, value, onChange, teams }: { label: string; value: string; onChange: (v: string) => void; teams: [string, { name: string; traits: string[]; formation: string }][] }) {
-  const team = teams.find(([id]) => id === value)?.[1]
   return (
-    <label className="flex min-w-48 flex-col gap-1">
-      <span className="text-xs text-ink-400">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5">
-        {teams.map(([id, t]) => (
-          <option key={id} value={id}>
-            {t.name}
-          </option>
-        ))}
-      </select>
-      {team && <span className="text-[11px] text-ink-400">{team.formation} · {team.traits.join(', ')}</span>}
-    </label>
+    <section className="border-t-2 border-ink py-10">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
+        <div>
+          <div className="label text-signal">Scenario lab</div>
+          <h2 className="display mt-2 text-[32px] leading-tight font-semibold">Set your own fixture.</h2>
+          <p className="mt-3 text-[15px] text-ink-3 italic">
+            A brand-new synthetic match - every event, 10 Hz tracking and full analytics - simulated in about ten seconds.
+          </p>
+        </div>
+        <div>
+          <p className="display text-[24px] leading-[1.7] text-ink-2 sm:text-[30px]">
+            <select value={home} onChange={(e) => setHome(e.target.value)} className="inline-select" aria-label="Home team">
+              {teams.map(([id, t]) => (
+                <option key={id} value={id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>{' '}
+            host{' '}
+            <select value={away} onChange={(e) => setAway(e.target.value)} className="inline-select" aria-label="Away team">
+              {teams.map(([id, t]) => (
+                <option key={id} value={id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+            .{' '}
+            {switchOn ? (
+              <>
+                At minute{' '}
+                <input type="number" min={10} max={85} value={minute} onChange={(e) => setMinute(Math.max(10, Math.min(85, +e.target.value)))} className="inline-input" aria-label="Minute of the switch" />
+                , the home side switch to{' '}
+                <select value={formation} onChange={(e) => setFormation(e.target.value)} className="inline-select" aria-label="New formation">
+                  {(options?.formations ?? ['3-4-3']).map((f) => (
+                    <option key={f}>{f}</option>
+                  ))}
+                </select>{' '}
+                and press <span className="italic-wonk text-signal">{pressWord}</span>.
+              </>
+            ) : (
+              <>Both coaches stick to their plans.</>
+            )}
+          </p>
+          <div className="mt-4 grid max-w-xl gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
+            {switchOn ? (
+              <label className="block">
+                <span className="label">Pressing intensity · <span className="num text-ink">{press.toFixed(2)}</span></span>
+                <input type="range" min={0} max={1} step={0.05} value={press} onChange={(e) => setPress(+e.target.value)} />
+              </label>
+            ) : (
+              <span />
+            )}
+            <label className="flex items-center gap-2 text-[15px] text-ink-2 italic">
+              <input type="checkbox" checked={switchOn} onChange={(e) => setSwitchOn(e.target.checked)} /> with a tactical switch
+            </label>
+          </div>
+          {homeTeam && awayTeam && (
+            <p className="mt-3 num text-[11px] text-ink-3 uppercase">
+              {homeTeam.formation} · {homeTeam.traits.join(', ') || 'balanced'} &nbsp;/&nbsp; {awayTeam.formation} ·{' '}
+              {awayTeam.traits.join(', ') || 'balanced'}
+            </p>
+          )}
+          <div className="mt-6 flex items-center gap-4">
+            <button onClick={create} disabled={busy || home === away} className="btn btn-solid">
+              {busy ? <span className="typing">Simulating</span> : <>Kick off &rarr;</>}
+            </button>
+            {home === away && <span className="text-[14px] text-signal italic">A club cannot play itself.</span>}
+            {error && <span className="text-[14px] text-signal">{error}</span>}
+          </div>
+        </div>
+      </div>
+    </section>
   )
 }
