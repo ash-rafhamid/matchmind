@@ -43,8 +43,9 @@ Competition: {competition}. Every club, player and event is synthetic; free to u
 ## How it was generated
 An event-level simulator walks the ball through the match; action probabilities depend on pitch location, opponent
 pressure, both teams' tactical dials (press, tempo, directness, width, line height, counter) and player attributes.
-Tracking is anchored to the events: the passer is at the ball when it is struck, the receiver where it arrives, the
-dribbler keeps it at their feet; between actions players follow the team shape with speed and acceleration limits. Averages over 400 simulated matches are calibrated to top-flight football (per team:
+A choreographer then plays the events out physically at 10 Hz: the carrier moves with the ball, passes are struck at
+real speeds and aimed where the receiver will be, defenders press, intercept and tackle the real ball, and every player
+runs with speed and acceleration limits. Event positions are rewritten from that motion, so events and tracking agree. Averages over 400 simulated matches are calibrated to top-flight football (per team:
 ~13.7 shots, 1.6 xG, 80% pass accuracy, 11 fouls, 5 corners; ~10-11 km and 27-32 km/h top speed per player).
 """
 

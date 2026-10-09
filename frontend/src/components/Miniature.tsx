@@ -31,6 +31,7 @@ export default function Miniature({ pkg, store, clock, mode, highlights = [], re
     s.setHighlights(latest.current.highlights)
     s.setReplay(latest.current.replay)
     stadium.current = s
+    if (window.location.search.includes('debug')) (window as unknown as { __mm: unknown }).__mm = { clock, store, stadium: s }
     return () => {
       s.dispose()
       stadium.current = null
