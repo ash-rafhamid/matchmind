@@ -53,3 +53,18 @@ def test_rejects_invented_facts() -> None:
     assert any("0.83" in i for i in issues)
     assert any(outsider in i for i in issues)
     assert any("#99999" in i for i in issues)
+
+
+def test_scorelines_must_match_a_real_score() -> None:
+    pkg = store.load(MATCHES[0])
+    first_goal = next(m for m in pkg["analytics"]["moments"] if m["type"] == "goal")
+    packet = moment_packet(pkg, first_goal)
+    after = list(packet["score_after_this_moment"].values())
+    real = f"{after[0]}-{after[1]}"
+    fake = "7-7"
+    assert verify(f"It is now {real}.", packet, store.LEAGUE_ROSTER).passed
+    assert not verify(f"That levels it at {fake}.", packet, store.LEAGUE_ROSTER).passed
+    # formations are not scorelines, but they must still be real
+    formation = pkg["meta"]["teams"]["home"]["dna"]["formation"]
+    assert verify(f"They set up in a {formation}.", packet, store.LEAGUE_ROSTER).passed
+    assert not verify("They set up in a 4-1-4-1.", packet, store.LEAGUE_ROSTER).passed

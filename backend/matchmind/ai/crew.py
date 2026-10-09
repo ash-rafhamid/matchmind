@@ -40,7 +40,7 @@ from agent_framework import (
 from .. import tools as match_tools
 from .personas import persona_brief
 from .templates import narrate_moment, narrate_whatif, recap as template_recap
-from .verifier import verify
+from .verifier import normalize_tags, verify
 
 MAX_DRAFTS = 2
 
@@ -62,6 +62,10 @@ Rules:
 - Keep evidence tags like [#123] right after the claim they support; they become replay links. Only use tags that
   appear in the packet or notes.
 - Player and team names must be written exactly as in the packet.
+- Only state a scoreline by copying it from a score field (score_before_this_moment / score_after_this_moment /
+  final_score). Never work one out yourself.
+- Do not add details the packet does not contain: which foot, the weather, the crowd, a player's feelings.
+- One evidence tag per bracket, e.g. "[#40] [#45]" - never "[#40, #45]" or tags without a number.
 - Return only the final text, no preamble."""
 
 HOST = """You are the Host of MatchMind, an AI football match crew, answering a viewer's question about one match.
@@ -71,6 +75,8 @@ HOST = """You are the Host of MatchMind, an AI football match crew, answering a 
 - For "why" questions you can consult the tactician tool.
 - When you mention a specific action, add its evidence tag [#id] from the tool results.
 - If the tools cannot answer the question, say so briefly.
+- Only state scorelines exactly as the tools return them. Do not add details the tools did not return.
+- One evidence tag per bracket, e.g. "[#40] [#45]".
 - Write for the audience described, in the requested language. Keep it under 150 words."""
 
 
@@ -193,9 +199,10 @@ class Storyteller(Executor):
         prompt = (f"{persona_brief(job.persona, job.language)}\n{self._task(job)}\n\nFact packet:\n"
                   f"{_packet_json(job.packet)}\n\n{notes_text}")
         response = await self.agent.run(prompt)
-        job.trace.append({"agent": "Storyteller", "kind": "llm", "output": response.text.strip(), "attempt": 1,
+        text = normalize_tags(response.text)
+        job.trace.append({"agent": "Storyteller", "kind": "llm", "output": text, "attempt": 1,
                           "ms": round(1000 * (time.perf_counter() - t0))})
-        await ctx.send_message(Draft(response.text.strip(), job, notes, 1))
+        await ctx.send_message(Draft(text, job, notes, 1))
 
     @handler
     async def revise(self, rev: Revision, ctx: WorkflowContext[Draft]) -> None:
@@ -207,9 +214,10 @@ class Storyteller(Executor):
                   "\n\nRewrite it. Fix or remove every unsupported claim. Keep everything else.")
         response = await self.agent.run(prompt)
         attempt = rev.draft.attempt + 1
-        job.trace.append({"agent": "Storyteller", "kind": "llm", "output": response.text.strip(),
+        text = normalize_tags(response.text)
+        job.trace.append({"agent": "Storyteller", "kind": "llm", "output": text,
                           "attempt": attempt, "ms": round(1000 * (time.perf_counter() - t0))})
-        await ctx.send_message(Draft(response.text.strip(), job, rev.draft.notes, attempt))
+        await ctx.send_message(Draft(text, job, rev.draft.notes, attempt))
 
 
 class FactChecker(Executor):
@@ -295,8 +303,8 @@ class Crew:
                 return outputs[-1]
             job.trace.append({"agent": "Producer", "kind": "rules", "output": "workflow produced no output", "ms": 0})
         except Exception as exc:  # model outage, quota, network: degrade, never break the demo
-            job.trace.append({"agent": "Producer", "kind": "rules", "output": f"AI unavailable ({type(exc).__name__})"
-                              " - using verified template", "ms": 0})
+            job.trace.append({"agent": "Producer", "kind": "rules", "output": f"AI unavailable "
+                              f"({type(exc).__name__}: {str(exc)[:200]}) - using verified template", "ms": 0})
         return _template(job)
 
     # ------------------------------------------------------------ Q&A
@@ -340,7 +348,7 @@ class Crew:
         except Exception as exc:
             return {"answer": f"The crew could not reach the AI model ({type(exc).__name__}). Try again shortly.",
                     "verdict": None, "trace": trace, "mode": "error"}
-        answer = response.text.strip()
+        answer = normalize_tags(response.text)
         trace.append({"agent": "Host", "kind": "llm", "output": answer, "ms": round(1000 * (time.perf_counter() - t0))})
         facts = {"tool_results": [e["result"] for e in evidence], "overview": match_tools.match_overview(match_id)}
         ids = _ids_in(facts)
@@ -348,7 +356,7 @@ class Crew:
         if not verdict.passed:
             retry = await host.run(prompt + "\n\nYour previous answer was rejected by the fact-checker:\n- "
                                    + "\n- ".join(verdict.issues) + "\nAnswer again using only tool results.")
-            answer = retry.text.strip()
+            answer = normalize_tags(retry.text)
             facts["tool_results"] = [e["result"] for e in evidence]
             verdict = verify(answer, facts, roster, _ids_in(facts))
             trace.append({"agent": "Host", "kind": "llm", "output": answer, "attempt": 2, "ms": 0})

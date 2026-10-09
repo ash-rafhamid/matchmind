@@ -47,7 +47,7 @@ def narrate_moment(packet: dict, persona: str) -> str:
     tag = f" [#{last}]" if last else ""
 
     if kind == "goal":
-        score = " - ".join(f"{t} {s}" for t, s in packet["score_now"].items())
+        score = " - ".join(f"{t} {s}" for t, s in packet["score_after_this_moment"].items())
         how = f"a {f['body_part']}" if f.get("body_part") == "head" else "a finish"
         assist = f", set up by {f['assist_by']}" if f.get("assist_by") else ""
         base = f"{clock} GOAL for {team}! {f['shooter']} scores with {how} from {f['distance_m']} m{assist}{tag}."

@@ -51,11 +51,18 @@ def moment_packet(pkg: dict, moment: dict) -> dict:
     recent = {teams[s]: _compact(team_stats(events, s, max(0.0, t - 600), t + 1)) for s in (side, other)}
     goals_so_far = [e for e in events if e["type"] == "goal" and e["ts"] <= t + 1]
     score = goals_so_far[-1]["score"] if goals_so_far else {"home": 0, "away": 0}
+    packet_score = {
+        "score_after_this_moment": {teams["home"]: score["home"], teams["away"]: score["away"]},
+    }
+    if moment["type"] == "goal":
+        before = dict(score)
+        before[side] -= 1
+        packet_score["score_before_this_moment"] = {teams["home"]: before["home"], teams["away"]: before["away"]}
     return {
         "match": f"{teams['home']} vs {teams['away']}",
         "competition": meta["competition"],
         "moment": {k: moment[k] for k in ("type", "clock", "title", "team_name", "players", "facts")},
-        "score_now": {teams["home"]: score["home"], teams["away"]: score["away"]},
+        **packet_score,
         "team_styles": [_dna(meta, "home"), _dna(meta, "away")],
         "last_10_minutes": recent,
         "event_trail": chain,
