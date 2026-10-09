@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import json
 import os
 import random
@@ -21,7 +20,7 @@ from starlette.concurrency import run_in_threadpool
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from . import store  # noqa: E402
+from . import cache, store  # noqa: E402
 from .ai.crew import Crew, Job  # noqa: E402
 from .ai.llm import make_client  # noqa: E402
 from .ai.packets import moment_packet, recap_packet  # noqa: E402
@@ -31,7 +30,6 @@ from .engine.sim import TacticalChange  # noqa: E402
 from .mcp_server import mcp  # noqa: E402
 from .whatif import DIALS, run_what_if  # noqa: E402
 
-CACHE_DIR = store.DATA_DIR.parent / "cache"
 FRONTEND = Path(os.environ.get("MATCHMIND_FRONTEND", Path(__file__).resolve().parents[2] / "frontend" / "dist"))
 MODEL = make_client()
 
@@ -87,20 +85,15 @@ def _client_key(request: Request) -> str:
 
 
 def _cache_get(key: str) -> dict | None:
-    path = CACHE_DIR / f"{key}.json"
-    if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return None
+    return cache.get(key)
 
 
 def _cache_put(key: str, value: dict) -> None:
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    (CACHE_DIR / f"{key}.json").write_text(json.dumps(value, ensure_ascii=False), encoding="utf-8")
+    cache.put(key, value)
 
 
 def _key(*parts: object) -> str:
-    raw = "|".join(str(p) for p in parts) + f"|{MODEL.provider}|{MODEL.model}"
-    return hashlib.sha1(raw.encode()).hexdigest()[:20]
+    return cache.make_key(MODEL.provider, MODEL.model, *parts)
 
 
 def _load(match_id: str) -> dict:
