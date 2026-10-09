@@ -12,3 +12,6 @@ createRoot(document.getElementById('root')!).render(
     </SettingsProvider>
   </StrictMode>,
 )
+
+// start fetching the 3D stadium straight away, in parallel with the match data
+void import('./components/Miniature')

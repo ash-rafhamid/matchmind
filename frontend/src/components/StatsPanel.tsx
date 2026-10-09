@@ -1,40 +1,42 @@
 import { useMemo, useState } from 'react'
 import { useMatch } from '../lib/match'
+import { useT } from '../lib/settings'
 import { onPrimary } from '../lib/ui'
 import type { Side } from '../types'
 
-const ROWS: [string, string, (v: number) => string][] = [
-  ['xg', 'Expected goals', (v) => v.toFixed(2)],
-  ['shots', 'Shots', String],
-  ['shots_on_target', 'On target', String],
-  ['big_chances', 'Big chances', String],
-  ['possession_pct', 'Possession %', String],
-  ['pass_accuracy_pct', 'Pass accuracy %', String],
-  ['field_tilt_pct', 'Field tilt %', String],
-  ['progressive_passes', 'Progressive passes', String],
-  ['box_touches', 'Touches in the box', String],
-  ['high_turnovers', 'High turnovers', String],
-  ['ppda', 'PPDA (lower = more press)', (v) => (v == null ? '-' : String(v))],
-  ['corners', 'Corners', String],
-  ['fouls', 'Fouls', String],
+const ROWS: [string, (v: number) => string][] = [
+  ['xg', (v) => v.toFixed(2)],
+  ['shots', String],
+  ['shots_on_target', String],
+  ['big_chances', String],
+  ['possession_pct', String],
+  ['pass_accuracy_pct', String],
+  ['field_tilt_pct', String],
+  ['progressive_passes', String],
+  ['box_touches', String],
+  ['high_turnovers', String],
+  ['ppda', (v) => (v == null ? '-' : String(v))],
+  ['corners', String],
+  ['fouls', String],
 ]
 
 /** The match centre: team comparison, the xG race, the players (events + tracking) and pass networks. */
 export default function StatsPanel() {
   const { pkg } = useMatch()
   const [period, setPeriod] = useState<'full' | 'first_half' | 'second_half'>('full')
+  const t = useT()
   const stats = pkg.analytics.team_stats[period]
   const { home, away } = pkg.meta.teams
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-12 sm:px-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h2 className="xp text-[40px] sm:text-[56px]">
-          Match centre<span className="xp-light"> / numbers</span>
+          {t('stats.centre')}<span className="xp-light"> {t('stats.numbers')}</span>
         </h2>
         <div className="seg" role="tablist">
           {(['full', 'first_half', 'second_half'] as const).map((p) => (
             <button key={p} role="tab" aria-selected={period === p} onClick={() => setPeriod(p)}>
-              {p === 'full' ? 'Match' : p === 'first_half' ? '1st half' : '2nd half'}
+              {p === 'full' ? t('stats.match') : p === 'first_half' ? t('stats.half1') : t('stats.half2')}
             </button>
           ))}
         </div>
@@ -46,13 +48,13 @@ export default function StatsPanel() {
             <span className="cut-r px-3 py-1 xp text-[14px]" style={{ background: home.primary, color: onPrimary(home) }}>
               {home.short}
             </span>
-            <span className="cond self-center text-ink-3">Team comparison</span>
+            <span className="cond self-center text-ink-3">{t('stats.comparison')}</span>
             <span className="cut-l px-3 py-1 xp text-[14px]" style={{ background: away.primary, color: onPrimary(away) }}>
               {away.short}
             </span>
           </div>
           <div className="mt-3">
-            {ROWS.map(([k, label, fmt]) => {
+            {ROWS.map(([k, fmt]) => {
               const a = Number(stats.home[k] ?? 0)
               const b = Number(stats.away[k] ?? 0)
               const invert = k === 'ppda' || k === 'fouls'
@@ -64,7 +66,7 @@ export default function StatsPanel() {
                 <div key={k} className="border-t border-line py-2">
                   <div className="flex items-baseline justify-between">
                     <span className={`w-14 text-[15px] tab-num ${homeLeads ? 'font-bold' : 'text-ink-3'}`}>{fmt(stats.home[k])}</span>
-                    <span className="cond text-[11px] text-ink-3">{label}</span>
+                    <span className="cond text-[11px] text-ink-3">{t(`stat.${k}`)}</span>
                     <span className={`w-14 text-right text-[15px] tab-num ${awayLeads ? 'font-bold' : 'text-ink-3'}`}>{fmt(stats.away[k])}</span>
                   </div>
                   <div className="mt-1.5 flex h-1.5 gap-[3px]">
@@ -110,10 +112,11 @@ function XgRace() {
     return d + ` L600,${Y(last).toFixed(1)}`
   }
   const final = tl.length ? tl[tl.length - 1] : { home_cum: 0, away_cum: 0 }
+  const t = useT()
   return (
     <div className="plate p-5">
       <div className="flex items-baseline justify-between">
-        <span className="cond text-ink-3">The xG race · click a goal to replay it</span>
+        <span className="cond text-ink-3">{t('stats.xgRace')}</span>
         <span className="xp text-[16px] tab-num">
           {final.home_cum.toFixed(2)} <span className="xp-light text-ink-4">/</span> {final.away_cum.toFixed(2)}
         </span>
@@ -158,6 +161,7 @@ function XgRace() {
 function PlayerTable() {
   const { pkg, name } = useMatch()
   const [sort, setSort] = useState('rating')
+  const t = useT()
   const rows = useMemo(() => {
     const team = (pid: string) => (pkg.meta.teams.home.starters.includes(pid) || pkg.meta.teams.home.bench.includes(pid) ? 'home' : 'away')
     return Object.entries(pkg.analytics.player_stats)
@@ -178,7 +182,7 @@ function PlayerTable() {
   ]
   return (
     <div className="plate p-5">
-      <span className="cond text-ink-3">The players · events + 10 Hz tracking · sort by any column</span>
+      <span className="cond text-ink-3">{t('stats.players')}</span>
       <div className="mt-3 overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead>

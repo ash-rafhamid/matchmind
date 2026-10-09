@@ -16,57 +16,95 @@ import type { MatchEvent, MatchPackage, Side } from '../types'
  * Pitch coordinates (x 0..105 towards the away goal, y 0..68 across) map to
  * three.js as X = x - 52.5, Z = y - 34, Y = height. The main camera sits on
  * the y = 68 touchline, so the home side attacks to the right, as on TV.
+ *
+ * Performance: every body part of all 30 footballers is one InstancedMesh
+ * (about ten draw calls for every player on the pitch), the scene only renders
+ * when it is on screen and something changed, and quality steps down
+ * automatically on slower machines.
  */
 
 export type CameraMode = 'director' | 'broadcast' | 'tactical' | 'goal' | 'follow'
 
 const L = 105
 const W = 68
-const FIG = 1.35 // figures are scaled up a little so they read at broadcast distance
+const FIG = 1.3 // figures are scaled up a little so they read at broadcast distance
 const BALL_R = 0.36
-const SKIN = ['#f1c9a5', '#d9a77f', '#b77b55', '#8d5a3b', '#5f3b28']
+const STRIDE = 1.9 // metres per full running cycle (two steps)
+const SKIN = ['#f1c9a5', '#e0b18a', '#c68f63', '#9c6a46', '#6e4a33', '#4f3324']
+const HAIR = ['#1b1612', '#2e2219', '#4a3424', '#7a5634', '#c9a25e', '#111111']
 const BALL_TYPES = new Set(['pass', 'carry', 'shot', 'interception', 'tackle', 'save', 'clearance', 'block'])
 
 const toX = (x: number) => x - L / 2
 const toZ = (y: number) => y - W / 2
 
-interface Figure {
-  group: THREE.Group
-  lean: THREE.Group
+interface Body {
+  x: number
+  z: number
   heading: number
   phase: number
-  last: THREE.Vector3 | null
+  amp: number
   speed: number
+  has: boolean
 }
 
 interface Shot {
   ts: number
   dir: 1 | -1
   goal: boolean
-  scorer?: string
 }
 
 export interface StadiumOptions {
-  /** Called with the column of the player under the pointer (or -1). */
-  onHover?: (pid: string | null) => void
   name: (pid: string) => string
-  tiltShift?: boolean
   crowd?: boolean
 }
 
+/** One body part for all players, drawn in a single call. */
+class Part {
+  mesh: THREE.InstancedMesh
+  constructor(geo: THREE.BufferGeometry, count: number, scene: THREE.Scene) {
+    this.mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.75 }), count)
+    this.mesh.castShadow = true
+    this.mesh.frustumCulled = false
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    scene.add(this.mesh)
+  }
+}
+
+const tmpM = new THREE.Matrix4()
+const tmpB = new THREE.Matrix4()
+const tmpQ = new THREE.Quaternion()
+const tmpV = new THREE.Vector3()
+const tmpS = new THREE.Vector3()
+const UP = new THREE.Vector3(0, 1, 0)
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0)
+
 export class Stadium {
+  private container: HTMLElement
+  private pkg: MatchPackage
+  private store: TrackingStore
+  private clock: PlaybackClock
+  private opts: StadiumOptions
+
   private renderer: THREE.WebGLRenderer
   private labels: CSS2DRenderer
   private composer: EffectComposer
   private hPass: ShaderPass
   private vPass: ShaderPass
   private scene = new THREE.Scene()
-  private camera = new THREE.PerspectiveCamera(20, 16 / 9, 1, 900)
+  private camera = new THREE.PerspectiveCamera(22, 16 / 9, 1, 900)
+  private sun!: THREE.DirectionalLight
   private raf = 0
   private ro: ResizeObserver
-  private figures: Figure[] = []
-  private ball: THREE.Mesh
-  private ring: THREE.Mesh
+  private io: IntersectionObserver
+  private onScreen = true
+  private disposed = false
+
+  private ids: string[] = []
+  private bodies: Body[] = []
+  private parts!: Record<'torso' | 'shorts' | 'legs' | 'socks' | 'boots' | 'arms' | 'sleeves' | 'head' | 'hair', Part>
+  private ball!: THREE.Mesh
+  private ballMark!: THREE.Mesh
+  private ring!: THREE.Mesh
   private passArc: THREE.Mesh | null = null
   private passKey = -1
   private arMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false })
@@ -75,28 +113,30 @@ export class Stadium {
   private ownerTag: CSS2DObject
   private hoverTag: CSS2DObject
   private xgTag: CSS2DObject
+  private tagText = new Map<CSS2DObject, string>()
   private crowd: THREE.InstancedMesh | null = null
   private crowdBase: { m: THREE.Matrix4; side: Side | 'n' }[] = []
   private cheer: { side: Side; until: number } | null = null
   private ballEvents: MatchEvent[]
   private shots: Shot[]
+
   private mode: CameraMode = 'director'
-  private camPos = new THREE.Vector3(0, 40, 90)
+  private camPos = new THREE.Vector3()
   private camLook = new THREE.Vector3()
   private focus = new THREE.Vector3()
-  private hoverIdx = -1
-  private pointer: THREE.Vector2 | null = null
-  private raycaster = new THREE.Raycaster()
-  private lastTime = 0
+  private focusY = 0.5
   private lastCut = ''
-  private ids: string[] = []
-  private disposed = false
+  private pointer: THREE.Vector2 | null = null
+  private pointerMoved = false
+  private raycaster = new THREE.Raycaster()
+  private hoverIdx = -1
 
-  private container: HTMLElement
-  private pkg: MatchPackage
-  private store: TrackingStore
-  private clock: PlaybackClock
-  private opts: StadiumOptions
+  private lastMatchT = -1
+  private lastNow = 0
+  private idleFrames = 0
+  private wasReady = false
+  private quality = 0
+  private frameTimes: number[] = []
 
   constructor(container: HTMLElement, pkg: MatchPackage, store: TrackingStore, clock: PlaybackClock, opts: StadiumOptions) {
     this.container = container
@@ -104,10 +144,10 @@ export class Stadium {
     this.store = store
     this.clock = clock
     this.opts = opts
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.shadowMap.enabled = true
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.05
     this.renderer.domElement.style.display = 'block'
@@ -125,39 +165,45 @@ export class Stadium {
     this.composer.addPass(this.vPass)
     this.composer.addPass(new ShaderPass(GRADE))
     this.composer.addPass(new OutputPass())
-    this.setTiltShift(opts.tiltShift ?? true)
 
     this.ballEvents = pkg.events.filter((e) => BALL_TYPES.has(e.type))
     this.shots = pkg.events
-      .filter((e) => e.type === 'shot')
-      .map((e) => ({ ts: e.ts, dir: e.team === 'home' ? 1 : -1, goal: e.outcome === 'goal', scorer: e.player ?? undefined }))
+      .filter((e) => e.type === 'shot' && (e.outcome === 'goal' || e.outcome === 'saved' || (e.xg ?? 0) >= 0.12))
+      .map((e) => ({ ts: e.ts, dir: e.team === 'home' ? 1 : -1, goal: e.outcome === 'goal' }))
 
     this.buildWorld()
-    this.ball = this.buildBall()
-    this.ring = this.buildRing()
+    this.buildBall()
+    this.buildFigures()
     this.scene.add(this.highlightGroup)
     this.ownerTag = this.tag('mm-tag mm-tag-owner')
     this.hoverTag = this.tag('mm-tag mm-tag-hover')
     this.xgTag = this.tag('mm-tag mm-tag-xg')
-    this.buildFigures()
+
+    // start a notch lower on small or very dense screens
+    const dpr = window.devicePixelRatio || 1
+    this.setQuality((navigator.hardwareConcurrency ?? 8) <= 4 || dpr > 2 ? 1 : 0)
 
     this.ro = new ResizeObserver(() => this.resize())
     this.ro.observe(container)
+    this.io = new IntersectionObserver(
+      (entries) => {
+        this.onScreen = entries[0]?.isIntersecting ?? true
+        this.idleFrames = 0
+      },
+      { threshold: 0.01 },
+    )
+    this.io.observe(container)
     this.resize()
     this.renderer.domElement.addEventListener('pointermove', this.onPointer)
     this.renderer.domElement.addEventListener('pointerleave', this.onLeave)
-    this.raf = requestAnimationFrame(this.frame)
+    this.raf = requestAnimationFrame(this.loop)
   }
 
   // ------------------------------------------------------------------ public
 
   setMode(mode: CameraMode) {
     this.mode = mode
-  }
-
-  setTiltShift(on: boolean) {
-    this.hPass.enabled = on
-    this.vPass.enabled = on
+    this.idleFrames = 0
   }
 
   /** Draw evidence events into the scene as numbered AR markers and arrows. */
@@ -180,16 +226,18 @@ export class Stadium {
       obj.position.copy(start).setY(0.3)
       this.highlightGroup.add(obj)
     })
+    this.idleFrames = 0
   }
 
   dispose() {
     this.disposed = true
     cancelAnimationFrame(this.raf)
     this.ro.disconnect()
+    this.io.disconnect()
     this.renderer.domElement.removeEventListener('pointermove', this.onPointer)
     this.renderer.domElement.removeEventListener('pointerleave', this.onLeave)
     this.scene.traverse((o) => {
-      if (o instanceof THREE.Mesh || o instanceof THREE.InstancedMesh || o instanceof THREE.LineSegments) {
+      if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
         o.geometry.dispose()
         const mats = Array.isArray(o.material) ? o.material : [o.material]
         mats.forEach((m) => {
@@ -202,6 +250,36 @@ export class Stadium {
     this.renderer.dispose()
     this.renderer.domElement.remove()
     this.labels.domElement.remove()
+  }
+
+  // ------------------------------------------------------------------ quality
+
+  /** 0 = full, 1 = lighter resolution, 2 = no tilt-shift, 3 = no shadows. */
+  private setQuality(level: number) {
+    this.quality = level
+    const dpr = window.devicePixelRatio || 1
+    const ratio = [Math.min(dpr, 1.75), Math.min(dpr, 1.25), 1, 0.85][level]
+    this.renderer.setPixelRatio(ratio)
+    this.composer.setPixelRatio(ratio)
+    const tilt = level < 2
+    this.hPass.enabled = tilt
+    this.vPass.enabled = tilt
+    this.sun.castShadow = level < 3
+    const size = level === 0 ? 2048 : 1024
+    if (this.sun.shadow.mapSize.x !== size) {
+      this.sun.shadow.mapSize.set(size, size)
+      this.sun.shadow.map?.dispose()
+      this.sun.shadow.map = null
+    }
+    this.resize()
+  }
+
+  private watchFrameRate(ms: number) {
+    this.frameTimes.push(ms)
+    if (this.frameTimes.length < 90) return
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length
+    this.frameTimes = []
+    if (avg > 24 && this.quality < 3) this.setQuality(this.quality + 1)
   }
 
   // ------------------------------------------------------------------ world
@@ -226,15 +304,14 @@ export class Stadium {
     sun.shadow.bias = -0.0004
     sun.shadow.normalBias = 0.04
     s.add(sun)
+    this.sun = sun
 
-    // the table the miniature stands on
     const table = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), new THREE.MeshStandardMaterial({ color: '#7d8b80', roughness: 1 }))
     table.rotation.x = -Math.PI / 2
     table.position.y = -0.05
     table.receiveShadow = true
     s.add(table)
 
-    // pitch, with mowing stripes and lines painted into one texture
     const pitch = new THREE.Mesh(new THREE.PlaneGeometry(L + 12, W + 12), new THREE.MeshStandardMaterial({ map: grassTexture(this.renderer), roughness: 0.92 }))
     pitch.rotation.x = -Math.PI / 2
     pitch.receiveShadow = true
@@ -244,6 +321,13 @@ export class Stadium {
     this.buildStands()
     this.buildBoards()
     this.buildPylons()
+
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.32, 48), this.arMat)
+    ring.rotation.x = -Math.PI / 2
+    ring.renderOrder = 2
+    ring.visible = false
+    s.add(ring)
+    this.ring = ring
   }
 
   private buildGoals() {
@@ -265,7 +349,6 @@ export class Stadium {
       bar.position.set(x, 2.44, 0)
       bar.castShadow = true
       g.add(bar)
-      // net: a wire box behind the goal line
       const pts: number[] = []
       const depth = 2.0 * dir
       for (let i = 0; i <= 12; i++) {
@@ -275,7 +358,7 @@ export class Stadium {
       for (let j = 0; j <= 5; j++) {
         const yy = (2.44 * j) / 5
         const back = 1.6 * (j / 5)
-        pts.push(x + depth, Math.min(back, 1.6), -3.66, x + depth, Math.min(back, 1.6), 3.66)
+        pts.push(x + depth, back, -3.66, x + depth, back, 3.66)
         pts.push(x, yy, -3.66, x + depth, Math.min(yy, 1.6), -3.66, x, yy, 3.66, x + depth, Math.min(yy, 1.6), 3.66)
       }
       const geo = new THREE.BufferGeometry()
@@ -291,39 +374,55 @@ export class Stadium {
     const roofMat = new THREE.MeshStandardMaterial({ color: '#eceae4', roughness: 0.6, metalness: 0.1 })
     const step = 1.5
     const rise = 1.05
-    const gap = 9 // from the touchline to the first row
+    const gap = 9
     const seats: { pos: THREE.Vector3; rotY: number; side: Side | 'n' }[] = []
+    let seed = 7
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 
     const stand = (length: number, along: 'x' | 'z', sign: 1 | -1, half: number, homeShare: number, tiers = 9, roofed = true) => {
+      // one stepped block per stand instead of one per tier
+      const shape = new THREE.Shape()
+      shape.moveTo(0, 0)
       for (let t = 0; t < tiers; t++) {
-        const dist = half + gap + t * step
+        shape.lineTo(t * step, 0.6 + t * rise)
+        shape.lineTo((t + 1) * step, 0.6 + t * rise)
+      }
+      shape.lineTo(tiers * step, 0)
+      shape.lineTo(0, 0)
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: length, bevelEnabled: false })
+      geo.translate(0, 0, -length / 2)
+      const block = new THREE.Mesh(geo, concrete)
+      const d0 = half + gap
+      if (along === 'x') {
+        block.rotation.y = sign === -1 ? Math.PI / 2 : -Math.PI / 2
+        block.position.set(0, 0, sign * d0)
+      } else {
+        block.rotation.y = sign === 1 ? 0 : Math.PI
+        block.position.set(sign * d0, 0, 0)
+      }
+      block.receiveShadow = true
+      this.scene.add(block)
+      for (let t = 0; t < tiers; t++) {
+        const dist = d0 + t * step + step * 0.5
         const h = 0.6 + t * rise
-        const block = new THREE.Mesh(new THREE.BoxGeometry(along === 'x' ? length : step, h, along === 'x' ? step : length), concrete)
-        if (along === 'x') block.position.set(0, h / 2, sign * (dist + step / 2))
-        else block.position.set(sign * (dist + step / 2), h / 2, 0)
-        block.receiveShadow = true
-        block.castShadow = t === tiers - 1
-        this.scene.add(block)
         const n = Math.floor(length / 0.95)
         for (let i = 0; i < n; i++) {
-          if (Math.random() < 0.08) continue // empty seats
+          if (rnd() < 0.08) continue
           const a = -length / 2 + (i + 0.5) * (length / n)
-          const p = along === 'x' ? new THREE.Vector3(a, h + 0.3, sign * (dist + step * 0.5)) : new THREE.Vector3(sign * (dist + step * 0.5), h + 0.3, a)
-          const r = Math.random()
+          const p = along === 'x' ? new THREE.Vector3(a, h + 0.3, sign * dist) : new THREE.Vector3(sign * dist, h + 0.3, a)
+          const r = rnd()
           const side: Side | 'n' = r < homeShare ? 'home' : r < homeShare + (1 - homeShare) * 0.8 ? 'away' : 'n'
           seats.push({ pos: p, rotY: along === 'x' ? 0 : Math.PI / 2, side })
         }
       }
       if (!roofed) return
-      // a thin roof over the back rows
-      const dist = half + gap + tiers * step
+      const dist = d0 + tiers * step
       const roof = new THREE.Mesh(new THREE.BoxGeometry(along === 'x' ? length + 4 : 9, 0.4, along === 'x' ? 9 : length + 4), roofMat)
       if (along === 'x') roof.position.set(0, 0.6 + tiers * rise + 4.5, sign * (dist - 2.5))
       else roof.position.set(sign * (dist - 2.5), 0.6 + tiers * rise + 4.5, 0)
       roof.castShadow = true
       this.scene.add(roof)
     }
-    // the far side and both ends get full stands; the near side is kept low and open so it frames the shot
     stand(L + 16, 'x', -1, W / 2, 0.75)
     stand(L + 16, 'x', 1, W / 2, 0.6, 5, false)
     stand(W + 6, 'z', -1, L / 2, 0.92)
@@ -331,26 +430,20 @@ export class Stadium {
     if (this.opts.crowd === false) return
 
     const geo = new THREE.BoxGeometry(0.5, 0.62, 0.45)
-    const mat = new THREE.MeshStandardMaterial({ roughness: 0.85 })
-    const mesh = new THREE.InstancedMesh(geo, mat, seats.length)
-    const neutral = ['#2d3436', '#dfe6e9', '#636e72', '#b2bec3', '#6c5ce7', '#fdcb6e']
-    const pal = {
-      home: [home.primary, home.primary, home.secondary],
-      away: [away.primary, away.primary, away.secondary],
-    }
-    const m = new THREE.Matrix4()
+    const mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ roughness: 0.85 }), seats.length)
+    const neutral = ['#2d3436', '#dfe6e9', '#636e72', '#b2bec3', '#3d5a80', '#e0a458']
+    const pal = { home: [home.primary, home.primary, home.secondary], away: [away.primary, away.primary, away.secondary] }
     const c = new THREE.Color()
     seats.forEach((seat, i) => {
-      m.makeRotationY(seat.rotY)
-      m.setPosition(seat.pos)
-      mesh.setMatrixAt(i, m)
+      tmpM.makeRotationY(seat.rotY)
+      tmpM.setPosition(seat.pos)
+      mesh.setMatrixAt(i, tmpM)
       const list = seat.side === 'n' ? neutral : pal[seat.side]
-      c.set(list[Math.floor(Math.random() * list.length)])
-      c.offsetHSL(0, 0, (Math.random() - 0.5) * 0.08)
+      c.set(list[Math.floor(rnd() * list.length)])
+      c.offsetHSL(0, 0, (rnd() - 0.5) * 0.08)
       mesh.setColorAt(i, c)
-      this.crowdBase.push({ m: m.clone(), side: seat.side })
+      this.crowdBase.push({ m: tmpM.clone(), side: seat.side })
     })
-    mesh.castShadow = false
     mesh.receiveShadow = true
     this.crowd = mesh
     this.scene.add(mesh)
@@ -358,18 +451,17 @@ export class Stadium {
 
   private buildBoards() {
     const tex = boardTexture()
-    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5, emissive: new THREE.Color('#ffffff'), emissiveMap: tex, emissiveIntensity: 0.35 })
     const board = (len: number, x: number, z: number, rotY: number) => {
       const t = tex.clone()
       t.repeat.set(len / 24, 1)
       t.wrapS = THREE.RepeatWrapping
       t.needsUpdate = true
-      const m = new THREE.Mesh(new THREE.BoxGeometry(len, 0.9, 0.12), mat.clone())
-      ;(m.material as THREE.MeshStandardMaterial).map = t
-      ;(m.material as THREE.MeshStandardMaterial).emissiveMap = t
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(len, 0.9, 0.12),
+        new THREE.MeshStandardMaterial({ map: t, roughness: 0.5, emissive: new THREE.Color('#ffffff'), emissiveMap: t, emissiveIntensity: 0.35 }),
+      )
       m.position.set(x, 0.45, z)
       m.rotation.y = rotY
-      m.castShadow = true
       this.scene.add(m)
     }
     board(L + 6, 0, -(W / 2 + 4.5), 0)
@@ -385,7 +477,6 @@ export class Stadium {
         const g = new THREE.Group()
         const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.6, 38, 8), mat)
         mast.position.y = 19
-        mast.castShadow = true
         const head = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 0.6), lamp)
         head.position.y = 38.5
         head.lookAt(new THREE.Vector3(-sx * 60, 0, -sz * 40))
@@ -395,68 +486,62 @@ export class Stadium {
       }
   }
 
+  /** Little footballers: shirt, shorts, socks, boots, arms, head and hair, all instanced. */
   private buildFigures() {
     const meta = this.pkg.meta
-    const body = new THREE.CapsuleGeometry(0.33, 0.42, 6, 14)
-    const legs = new THREE.CapsuleGeometry(0.25, 0.46, 6, 12)
-    const head = new THREE.SphereGeometry(0.2, 16, 12)
-    const mats = new Map<string, THREE.MeshStandardMaterial>()
-    const mat = (c: string) => {
-      if (!mats.has(c)) mats.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.7 }))
-      return mats.get(c)!
+    const players = (['home', 'away'] as Side[]).flatMap((side) => meta.teams[side].players.map((p) => ({ p, side })))
+    const n = players.length
+    this.ids = players.map(({ p }) => p.id)
+    const g = {
+      torso: new THREE.CylinderGeometry(0.23, 0.18, 0.54, 12),
+      shorts: new THREE.CylinderGeometry(0.2, 0.215, 0.24, 12),
+      legs: new THREE.CapsuleGeometry(0.085, 0.66, 4, 8).translate(0, -0.415, 0),
+      socks: new THREE.CylinderGeometry(0.098, 0.092, 0.34, 8).translate(0, -0.58, 0),
+      boots: new THREE.BoxGeometry(0.13, 0.09, 0.27).translate(0, -0.79, 0.05),
+      arms: new THREE.CapsuleGeometry(0.055, 0.44, 4, 8).translate(0, -0.275, 0),
+      sleeves: new THREE.CylinderGeometry(0.078, 0.072, 0.18, 8).translate(0, -0.07, 0),
+      head: new THREE.SphereGeometry(0.125, 14, 10),
+      hair: new THREE.SphereGeometry(0.133, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5).translate(0, 0.012, -0.012),
     }
-    const ids: string[] = []
-    for (const side of ['home', 'away'] as Side[]) {
+    const counts = { torso: n, shorts: n, legs: 2 * n, socks: 2 * n, boots: 2 * n, arms: 2 * n, sleeves: 2 * n, head: n, hair: n }
+    this.parts = Object.fromEntries(Object.entries(g).map(([k, geo]) => [k, new Part(geo, counts[k as keyof typeof counts], this.scene)])) as Stadium['parts']
+    const col = new THREE.Color()
+    players.forEach(({ p, side }, i) => {
       const team = meta.teams[side]
-      for (const p of team.players) {
-        ids.push(p.id)
-        const gk = p.role === 'GK'
-        const shirt = gk ? (side === 'home' ? '#f5d90a' : '#39d353') : team.primary
-        const shorts = gk ? '#222222' : team.secondary
-        const group = new THREE.Group()
-        const lean = new THREE.Group()
-        const b = new THREE.Mesh(body, mat(shirt))
-        b.position.y = 1.22
-        const l = new THREE.Mesh(legs, mat(shorts))
-        l.position.y = 0.52
-        const h = new THREE.Mesh(head, mat(SKIN[hash(p.id) % SKIN.length]))
-        h.position.y = 1.86
-        for (const m of [b, l, h]) {
-          m.castShadow = true
-          m.userData.pid = p.id
-        }
-        lean.add(b, l, h)
-        group.add(lean)
-        group.scale.setScalar(FIG)
-        group.visible = false
-        this.scene.add(group)
-        this.figures.push({ group, lean, heading: side === 'home' ? Math.PI / 2 : -Math.PI / 2, phase: Math.random() * 6, last: null, speed: 0 })
+      const gk = p.role === 'GK'
+      const h = hash(p.id)
+      const shirt = gk ? (side === 'home' ? '#f5d90a' : '#39d353') : team.primary
+      const shorts = gk ? '#1f1f1f' : team.secondary
+      const socks = gk ? '#1f1f1f' : team.primary
+      const skin = SKIN[h % SKIN.length]
+      const set = (part: keyof Stadium['parts'], idx: number, c: string) => this.parts[part].mesh.setColorAt(idx, col.set(c))
+      set('torso', i, shirt)
+      set('shorts', i, shorts)
+      set('head', i, skin)
+      set('hair', i, HAIR[(h >> 3) % HAIR.length])
+      for (const k of [2 * i, 2 * i + 1]) {
+        set('legs', k, skin)
+        set('socks', k, socks)
+        set('boots', k, (h >> 5) % 3 === 0 ? '#f2f2f2' : '#151515')
+        set('arms', k, skin)
+        set('sleeves', k, shirt)
       }
+      this.bodies.push({ x: 0, z: 0, heading: side === 'home' ? Math.PI / 2 : -Math.PI / 2, phase: (h % 100) / 16, amp: 0, speed: 0, has: false })
+    })
+    for (const part of Object.values(this.parts)) {
+      for (let k = 0; k < part.mesh.count; k++) part.mesh.setMatrixAt(k, ZERO)
+      part.mesh.instanceColor!.needsUpdate = true
     }
-    this.ids = ids
   }
 
-  private ballMark!: THREE.Mesh
-
-  private buildBall(): THREE.Mesh {
-    // a soft white disc under the ball so the eye can always find it, as broadcast ball trackers do
+  private buildBall() {
     this.ballMark = new THREE.Mesh(new THREE.CircleGeometry(0.75, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, depthWrite: false }))
     this.ballMark.rotation.x = -Math.PI / 2
     this.ballMark.renderOrder = 1
     this.scene.add(this.ballMark)
-    const tex = ballTexture()
-    const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 24, 16), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35 }))
-    ball.castShadow = true
-    this.scene.add(ball)
-    return ball
-  }
-
-  private buildRing(): THREE.Mesh {
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.05, 1.32, 48), this.arMat)
-    ring.rotation.x = -Math.PI / 2
-    ring.renderOrder = 2
-    this.scene.add(ring)
-    return ring
+    this.ball = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 24, 16), new THREE.MeshStandardMaterial({ map: ballTexture(), roughness: 0.35 }))
+    this.ball.castShadow = true
+    this.scene.add(this.ball)
   }
 
   private tag(cls: string): CSS2DObject {
@@ -468,16 +553,21 @@ export class Stadium {
     return obj
   }
 
+  private setTag(obj: CSS2DObject, html: string) {
+    if (this.tagText.get(obj) === html) return
+    this.tagText.set(obj, html)
+    obj.element.innerHTML = html
+  }
+
   private arc(a: THREE.Vector3, b: THREE.Vector3, peak: number, mat: THREE.Material, radius = 0.09): THREE.Mesh {
     const mid = a.clone().lerp(b, 0.5)
     mid.y = Math.max(a.y, b.y) + peak
-    const curve = new THREE.QuadraticBezierCurve3(a, mid, b)
-    const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, radius, 6, false), mat)
+    const mesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, mid, b), 32, radius, 6, false), mat)
     mesh.renderOrder = 3
     return mesh
   }
 
-  // ------------------------------------------------------------------ per frame
+  // ------------------------------------------------------------------ loop
 
   private resize = () => {
     const w = this.container.clientWidth
@@ -490,153 +580,205 @@ export class Stadium {
     this.composer.setSize(w, h)
     this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
-    this.hPass.uniforms.h.value = 2.2 / w
-    this.vPass.uniforms.v.value = 2.2 / h
+    this.hPass.uniforms.h.value = 1.5 / w
+    this.vPass.uniforms.v.value = 1.5 / h
+    this.idleFrames = 0
   }
 
   private onPointer = (e: PointerEvent) => {
     const r = this.renderer.domElement.getBoundingClientRect()
     this.pointer = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
+    this.pointerMoved = true
   }
 
   private onLeave = () => {
     this.pointer = null
+    this.pointerMoved = true
   }
 
-  private frame = () => {
+  private loop = (now: number) => {
     if (this.disposed) return
-    this.raf = requestAnimationFrame(this.frame)
+    this.raf = requestAnimationFrame(this.loop)
+    const realDt = this.lastNow ? Math.min(0.1, (now - this.lastNow) / 1000) : 0.016
+    this.lastNow = now
+    if (!this.onScreen || document.hidden) return
+
     const t = this.clock.time
-    const dt = Math.min(0.1, Math.abs(t - this.lastTime))
-    this.lastTime = t
     const f = this.store.frameAt(t)
-    if (f) this.place(f, t, dt)
-    this.updateCamera(t, f)
-    this.updateCrowd()
-    const tilt = this.mode !== 'tactical'
-    this.hPass.uniforms.r.value = this.vPass.uniforms.r.value = 0.52
-    if (this.hPass.enabled !== tilt && (this.opts.tiltShift ?? true)) this.setTiltShift(tilt)
+    const ready = f !== null
+    const changed = t !== this.lastMatchT || this.pointerMoved || this.cheer !== null || ready !== this.wasReady
+    this.wasReady = ready
+    // when paused and nothing moves, stop redrawing once the camera has settled
+    this.idleFrames = changed ? 0 : this.idleFrames + 1
+    if (this.idleFrames > 150) return
+    const dtMatch = this.lastMatchT < 0 ? 0 : t - this.lastMatchT
+    this.lastMatchT = t
+    this.pointerMoved = false
+
+    if (f) this.place(f, t, dtMatch, realDt)
+    this.updateCamera(t, f, realDt)
+    this.updateCrowd(now)
     this.composer.render()
     this.labels.render(this.scene, this.camera)
+    if (this.clock.playing) this.watchFrameRate(realDt * 1000)
   }
 
-  private place(f: NonNullable<ReturnType<TrackingStore['frameAt']>>, t: number, dt: number) {
-    for (let j = 0; j < this.figures.length; j++) {
-      const fig = this.figures[j]
-      const col = f.ids.indexOf(this.ids[j])
-      const x = col >= 0 ? f.x[col] : NaN
-      if (Number.isNaN(x)) {
-        fig.group.visible = false
-        fig.last = null
+  private place(f: NonNullable<ReturnType<TrackingStore['frameAt']>>, t: number, dtMatch: number, realDt: number) {
+    const [bxp, byp] = f.ball
+    const bx = toX(bxp)
+    const bz = toZ(byp)
+    const teleport = Math.abs(dtMatch) > 1.5
+    const P = this.parts
+    for (let i = 0; i < this.bodies.length; i++) {
+      const b = this.bodies[i]
+      const xr = f.x[i]
+      if (f.ids[i] !== this.ids[i] || Number.isNaN(xr)) {
+        if (b.has) {
+          for (const [part, k] of [['torso', i], ['shorts', i], ['head', i], ['hair', i]] as const) P[part].mesh.setMatrixAt(k, ZERO)
+          for (const part of ['legs', 'socks', 'boots', 'arms', 'sleeves'] as const) {
+            P[part].mesh.setMatrixAt(2 * i, ZERO)
+            P[part].mesh.setMatrixAt(2 * i + 1, ZERO)
+          }
+        }
+        b.has = false
         continue
       }
-      const pos = new THREE.Vector3(toX(x), 0, toZ(f.y[col]))
-      fig.group.visible = true
-      if (fig.last && dt > 0) {
-        const v = pos.clone().sub(fig.last)
-        const sp = v.length() / dt
-        fig.speed += (Math.min(sp, 10) - fig.speed) * 0.2
-        if (v.lengthSq() > 1e-4) {
-          const target = Math.atan2(v.x, v.z)
-          let d = target - fig.heading
-          d = Math.atan2(Math.sin(d), Math.cos(d))
-          fig.heading += d * Math.min(1, 0.25 + fig.speed * 0.03)
-        }
-        fig.phase += dt * (4 + fig.speed * 1.6)
+      const x = toX(xr)
+      const z = toZ(f.y[i])
+      let vx = 0
+      let vz = 0
+      if (b.has && !teleport && dtMatch > 0) {
+        vx = (x - b.x) / dtMatch
+        vz = (z - b.z) / dtMatch
+        const dist = Math.hypot(x - b.x, z - b.z)
+        b.phase += (dist / STRIDE) * Math.PI * 2
       }
-      fig.last = pos
-      fig.group.position.copy(pos)
-      fig.group.position.y = Math.abs(Math.sin(fig.phase)) * Math.min(0.09, fig.speed * 0.012)
-      fig.group.rotation.y = fig.heading
-      fig.lean.rotation.x = Math.min(0.22, fig.speed * 0.028)
-    }
+      const sp = Math.min(10, Math.hypot(vx, vz))
+      const k = 1 - Math.exp(-10 * realDt)
+      if (dtMatch !== 0 || !b.has) b.speed += (sp - b.speed) * (b.has ? k : 1)
+      b.amp += (Math.min(1, b.speed / 6.5) - b.amp) * k
+      // run towards where you are going; when standing, face the ball
+      const target = b.speed > 1.2 ? Math.atan2(vx, vz) : Math.atan2(bx - x, bz - z)
+      let d = target - b.heading
+      d = Math.atan2(Math.sin(d), Math.cos(d))
+      b.heading += d * (1 - Math.exp(-(b.speed > 1.2 ? 9 : 3) * realDt))
+      b.x = x
+      b.z = z
+      b.has = true
 
-    // ball: lifted by its height, spinning with its speed
-    const [bx, by] = f.ball
-    const prev = this.ball.position.clone()
-    this.ball.position.set(toX(bx), BALL_R + f.ballZ, toZ(by))
-    this.ballMark.position.set(this.ball.position.x, 0.03, this.ball.position.z)
-    ;(this.ballMark.material as THREE.MeshBasicMaterial).opacity = Math.max(0.12, 0.38 - f.ballZ * 0.03)
-    const travel = this.ball.position.distanceTo(prev)
+      const swing = Math.sin(b.phase) * 0.75 * b.amp
+      const bob = Math.abs(Math.cos(b.phase)) * 0.05 * b.amp
+      const lean = 0.16 * Math.min(1, b.speed / 8)
+      tmpQ.setFromAxisAngle(UP, b.heading)
+      tmpB.compose(tmpV.set(x, bob * FIG, z), tmpQ, tmpS.setScalar(FIG))
+      tmpB.multiply(tmpM.makeRotationX(lean))
+      const at = (ox: number, oy: number, rotX: number) => {
+        const m = new THREE.Matrix4().makeTranslation(ox, oy, 0)
+        if (rotX) m.multiply(tmpM.makeRotationX(rotX))
+        return m.premultiply(tmpB)
+      }
+      P.torso.mesh.setMatrixAt(i, at(0, 1.31, 0))
+      P.shorts.mesh.setMatrixAt(i, at(0, 0.92, 0))
+      const head = at(0, 1.74, 0)
+      P.head.mesh.setMatrixAt(i, head)
+      P.hair.mesh.setMatrixAt(i, head)
+      const legL = at(-0.11, 0.88, swing)
+      const legR = at(0.11, 0.88, -swing)
+      const armL = at(-0.3, 1.52, -swing * 0.8)
+      const armR = at(0.3, 1.52, swing * 0.8)
+      for (const part of ['legs', 'socks', 'boots'] as const) {
+        P[part].mesh.setMatrixAt(2 * i, legL)
+        P[part].mesh.setMatrixAt(2 * i + 1, legR)
+      }
+      for (const part of ['arms', 'sleeves'] as const) {
+        P[part].mesh.setMatrixAt(2 * i, armL)
+        P[part].mesh.setMatrixAt(2 * i + 1, armR)
+      }
+    }
+    for (const part of Object.values(P)) part.mesh.instanceMatrix.needsUpdate = true
+
+    // ball: lifted by its height, spinning with its speed, with a marker on the grass
+    const prevX = this.ball.position.x
+    const prevZ = this.ball.position.z
+    this.ball.position.set(bx, BALL_R + f.ballZ, bz)
+    const travel = Math.hypot(bx - prevX, bz - prevZ)
     if (travel < 5) this.ball.rotation.x += travel / BALL_R
+    this.ballMark.position.set(bx, 0.03, bz)
+    ;(this.ballMark.material as THREE.MeshBasicMaterial).opacity = Math.max(0.12, 0.38 - f.ballZ * 0.03)
 
     // the player on the ball: a ring on the grass and a name tag
-    const owner = f.owner >= 0 ? f.ids[f.owner] : null
-    const oi = owner ? this.ids.indexOf(owner) : -1
-    if (oi >= 0 && this.figures[oi].group.visible) {
-      const g = this.figures[oi].group.position
+    const oi = f.owner >= 0 && f.owner < this.bodies.length && this.bodies[f.owner].has ? f.owner : -1
+    if (oi >= 0) {
+      const b = this.bodies[oi]
       this.ring.visible = true
-      this.ring.position.set(g.x, 0.04, g.z)
-      const s = 1 + 0.08 * Math.sin(performance.now() / 160)
-      this.ring.scale.setScalar(s)
+      this.ring.position.set(b.x, 0.04, b.z)
+      this.ring.scale.setScalar(1 + 0.06 * Math.sin(performance.now() / 160))
       this.ownerTag.visible = true
-      this.ownerTag.position.set(g.x, 2.9 * FIG, g.z)
-      const sp = this.figures[oi].speed * 3.6
-      this.ownerTag.element.innerHTML = `<b>${esc(surname(this.opts.name(owner!)))}</b>${sp > 14 ? `<i>${sp.toFixed(0)} km/h</i>` : ''}`
+      this.ownerTag.position.set(b.x, 2.75 * FIG, b.z)
+      const kmh = Math.round(b.speed * 3.6)
+      this.setTag(this.ownerTag, `<b>${esc(surname(this.opts.name(this.ids[oi])))}</b>${kmh > 14 ? `<i>${kmh} km/h</i>` : ''}`)
     } else {
       this.ring.visible = false
       this.ownerTag.visible = false
     }
 
-    // the pass or shot being played, drawn as an arc over the grass
+    // the pass or shot being played, as an arc over the grass
     const idx = lastIndex(this.ballEvents, t)
     const cur = idx >= 0 ? this.ballEvents[idx] : null
-    const live = cur && (cur.type === 'pass' || cur.type === 'clearance' || cur.type === 'shot') && t <= cur.ts + cur.dur + 0.3 && cur.end_x !== undefined
+    const live = !!cur && (cur.type === 'pass' || cur.type === 'clearance' || cur.type === 'shot') && t <= cur.ts + cur.dur + 0.3 && cur.end_x !== undefined
     if (live && cur!.id !== this.passKey) {
       this.clearArc()
       const nxt = this.ballEvents[idx + 1]
-      const snap = nxt && nxt.ts - (cur!.ts + cur!.dur) < 0.6 && nxt.set_piece == null
+      const snap = !!nxt && nxt.ts - (cur!.ts + cur!.dur) < 0.6 && nxt.set_piece == null
       const ex = cur!.type !== 'shot' && snap ? nxt.x : cur!.end_x!
       const ey = cur!.type !== 'shot' && snap ? nxt.y : cur!.end_y!
       const lofted = cur!.pass_type === 'long' || cur!.pass_type === 'cross' || cur!.type === 'clearance'
       const len = Math.hypot(ex - cur!.x, ey - cur!.y)
       const peak = cur!.type === 'shot' ? 1.4 : lofted ? Math.min(14, 0.16 * len) * 0.9 : 0.25
       const a = new THREE.Vector3(toX(cur!.x), 0.12, toZ(cur!.y))
-      const b = new THREE.Vector3(toX(ex), cur!.type === 'shot' ? 1.1 : 0.12, toZ(ey))
-      this.passArc = this.arc(a, b, peak, cur!.type === 'shot' ? this.shotMat : this.arMat, cur!.type === 'shot' ? 0.12 : 0.07)
+      const bpt = new THREE.Vector3(toX(ex), cur!.type === 'shot' ? 1.1 : 0.12, toZ(ey))
+      this.passArc = this.arc(a, bpt, peak, cur!.type === 'shot' ? this.shotMat : this.arMat, cur!.type === 'shot' ? 0.12 : 0.07)
       this.scene.add(this.passArc)
       this.passKey = cur!.id
       if (cur!.type === 'shot' && cur!.xg !== undefined) {
         this.xgTag.visible = true
         this.xgTag.position.copy(a).setY(3.2)
-        this.xgTag.element.textContent = `xG ${cur!.xg.toFixed(2)}`
+        this.setTag(this.xgTag, `xG ${cur!.xg.toFixed(2)}`)
       }
     } else if (!live && this.passArc) {
       this.clearArc()
     }
-    if (this.passArc) {
-      const age = cur ? t - cur.ts : 9
-      ;(this.passArc.material as THREE.MeshBasicMaterial).opacity = Math.max(0.15, 0.9 - age * 0.12)
-    }
+    if (this.passArc && cur) (this.passArc.material as THREE.MeshBasicMaterial).opacity = Math.max(0.2, 0.9 - (t - cur.ts) * 0.12)
+    if (!live) this.xgTag.visible = false
 
-    // goals: the scoring end jumps
-    if (cur?.type === 'shot' && cur.outcome === 'goal' && t - (cur.ts + cur.dur) > 0 && t - (cur.ts + cur.dur) < 0.5) {
-      this.cheer = { side: cur.team, until: t + 6 }
+    // a goal: the scoring end jumps
+    if (cur?.type === 'shot' && cur.outcome === 'goal') {
+      const since = t - (cur.ts + cur.dur)
+      if (since > 0 && since < 0.6 && !this.cheer) this.cheer = { side: cur.team, until: t + 6 }
     }
 
     // hover: name, number and speed
     this.hoverIdx = -1
     if (this.pointer) {
       this.raycaster.setFromCamera(this.pointer, this.camera)
-      const hits = this.raycaster.intersectObjects(this.figures.filter((x) => x.group.visible).map((x) => x.group), true)
-      const pid = hits[0]?.object.userData.pid as string | undefined
-      if (pid) this.hoverIdx = this.ids.indexOf(pid)
+      const torso = this.parts.torso.mesh
+      torso.computeBoundingSphere()
+      const hit = this.raycaster.intersectObject(torso, false)[0]
+      if (hit?.instanceId !== undefined) this.hoverIdx = hit.instanceId
     }
-    if (this.hoverIdx >= 0 && this.hoverIdx !== oi) {
-      const fig = this.figures[this.hoverIdx]
+    if (this.hoverIdx >= 0 && this.hoverIdx !== oi && this.bodies[this.hoverIdx].has) {
+      const b = this.bodies[this.hoverIdx]
       const pid = this.ids[this.hoverIdx]
       const team = this.hoverIdx < this.pkg.meta.teams.home.players.length ? this.pkg.meta.teams.home : this.pkg.meta.teams.away
       const num = team.players.find((p) => p.id === pid)?.number ?? ''
       this.hoverTag.visible = true
-      this.hoverTag.position.set(fig.group.position.x, 2.9 * FIG, fig.group.position.z)
-      this.hoverTag.element.innerHTML = `<b>${num} ${esc(this.opts.name(pid))}</b><i>${(fig.speed * 3.6).toFixed(0)} km/h</i>`
+      this.hoverTag.position.set(b.x, 2.75 * FIG, b.z)
+      this.setTag(this.hoverTag, `<b>${num} ${esc(this.opts.name(pid))}</b><i>${Math.round(b.speed * 3.6)} km/h</i>`)
       this.renderer.domElement.style.cursor = 'pointer'
     } else {
       this.hoverTag.visible = false
       this.renderer.domElement.style.cursor = ''
     }
-    if (!live) this.xgTag.visible = false
-    this.opts.onHover?.(this.hoverIdx >= 0 ? this.ids[this.hoverIdx] : null)
   }
 
   private clearArc() {
@@ -649,28 +791,28 @@ export class Stadium {
 
   // ------------------------------------------------------------------ the director
 
-  private directorShot(t: number): 'broadcast' | 'goal' | 'celebrate' | 'tactical' {
+  private directorShot(t: number): 'broadcast' | 'goal' | 'celebrate' {
     for (const s of this.shots) {
-      if (t >= s.ts - 2.6 && t <= s.ts + 2.4) return 'goal'
-      if (s.goal && t > s.ts + 2.4 && t < s.ts + 9) return 'celebrate'
+      if (t >= s.ts - 2.2 && t <= s.ts + 2.0) return 'goal'
+      if (s.goal && t > s.ts + 2.0 && t < s.ts + 8) return 'celebrate'
     }
     return 'broadcast'
   }
 
-  private updateCamera(t: number, f: ReturnType<TrackingStore['frameAt']>) {
+  private updateCamera(t: number, f: ReturnType<TrackingStore['frameAt']>, realDt: number) {
     const ball = this.ball.position
-    const k = 1 - Math.exp(-4 * 0.016)
-    this.focus.lerp(new THREE.Vector3(ball.x, 0, ball.z), k)
+    const kf = 1 - Math.exp(-3.5 * realDt)
+    this.focus.x += (ball.x - this.focus.x) * kf
+    this.focus.z += (ball.z - this.focus.z) * kf
     const fx = this.focus.x
     const fz = this.focus.z
-    let shot: string = this.mode
-    if (this.mode === 'director') shot = this.directorShot(t)
+    const shot = this.mode === 'director' ? this.directorShot(t) : this.mode
     const cut = shot !== this.lastCut
     this.lastCut = shot
 
-    const pos = new THREE.Vector3()
+    const pos = tmpV
     const look = new THREE.Vector3()
-    let fov = 20
+    let fov = 22
     switch (shot) {
       case 'tactical':
         pos.set(0, 150, 62)
@@ -678,7 +820,7 @@ export class Stadium {
         fov = 30
         break
       case 'goal': {
-        const s = this.shots.find((x) => t >= x.ts - 2.6 && t <= x.ts + 2.4)
+        const s = this.shots.find((x) => t >= x.ts - 2.2 && t <= x.ts + 2.0)
         const dir = s?.dir ?? (fx >= 0 ? 1 : -1)
         pos.set(dir * (L / 2 + 34), 17, fz * 0.25 + 8)
         look.set(dir * (L / 2 - 14), 0, fz * 0.6)
@@ -693,8 +835,8 @@ export class Stadium {
         break
       }
       case 'follow': {
-        const owner = f && f.owner >= 0 ? f.teams[f.owner] : null
-        const dir = owner === 'away' ? -1 : 1
+        const side = f && f.owner >= 0 ? f.teams[f.owner] : null
+        const dir = side === 'away' ? -1 : 1
         pos.set(fx - dir * 20, 9, fz + 10)
         look.set(fx + dir * 8, 0, fz)
         fov = 34
@@ -709,35 +851,34 @@ export class Stadium {
       this.camPos.copy(pos)
       this.camLook.copy(look)
     } else {
-      const s = shot === 'broadcast' ? 0.06 : 0.12
-      this.camPos.lerp(pos, s)
-      this.camLook.lerp(look, s)
+      const k = 1 - Math.exp(-(shot === 'broadcast' ? 2.6 : 4.5) * realDt)
+      this.camPos.lerp(pos, k)
+      this.camLook.lerp(look, k)
     }
     this.camera.position.copy(this.camPos)
     this.camera.lookAt(this.camLook)
     if (Math.abs(this.camera.fov - fov) > 0.01) {
-      this.camera.fov += (fov - this.camera.fov) * (cut ? 1 : 0.1)
+      this.camera.fov = cut ? fov : this.camera.fov + (fov - this.camera.fov) * (1 - Math.exp(-5 * realDt))
       this.camera.updateProjectionMatrix()
     }
+    // keep the tilt-shift's sharp band on the ball, so the action is always in focus
+    const ndc = this.ball.position.clone().project(this.camera)
+    const target = Math.min(0.85, Math.max(0.15, (ndc.y + 1) / 2))
+    this.focusY += (target - this.focusY) * (cut ? 1 : 1 - Math.exp(-4 * realDt))
+    this.hPass.uniforms.r.value = this.vPass.uniforms.r.value = this.focusY
   }
 
-  private updateCrowd() {
-    if (!this.crowd) return
-    const t = this.clock.time
-    const active = this.cheer && t < this.cheer.until
-    if (!active && !this.crowd.userData.dirty) return
-    const m = new THREE.Matrix4()
-    const now = performance.now() / 1000
+  private updateCrowd(now: number) {
+    if (!this.crowd || !this.cheer) return
+    const active = this.clock.time < this.cheer.until
+    const s = now / 1000
     this.crowdBase.forEach((b, i) => {
-      m.copy(b.m)
-      if (active && b.side === this.cheer!.side) {
-        const jump = Math.max(0, Math.sin(now * 9 + i * 1.7)) * 0.55
-        m.elements[13] += jump
-      }
-      this.crowd!.setMatrixAt(i, m)
+      if (b.side !== this.cheer!.side) return
+      tmpM.copy(b.m)
+      if (active) tmpM.elements[13] += Math.max(0, Math.sin(s * 9 + i * 1.7)) * 0.55
+      this.crowd!.setMatrixAt(i, tmpM)
     })
     this.crowd.instanceMatrix.needsUpdate = true
-    this.crowd.userData.dirty = active
     if (!active) this.cheer = null
   }
 }
@@ -746,7 +887,7 @@ export class Stadium {
 
 const GRADE = {
   name: 'Grade',
-  uniforms: { tDiffuse: { value: null }, saturation: { value: 1.18 }, vignette: { value: 0.32 } },
+  uniforms: { tDiffuse: { value: null }, saturation: { value: 1.15 }, vignette: { value: 0.3 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `uniform sampler2D tDiffuse; uniform float saturation; uniform float vignette; varying vec2 vUv;
     void main(){ vec4 c = texture2D(tDiffuse, vUv); float g = dot(c.rgb, vec3(0.299,0.587,0.114));
@@ -783,36 +924,42 @@ function lastIndex(events: MatchEvent[], t: number): number {
   return ans
 }
 
-/** Grass with mowing stripes and pitch markings, 20 px per metre. */
+/** Grass with mowing stripes and pitch markings, 16 px per metre; noise comes from one small repeating tile. */
 function grassTexture(renderer: THREE.WebGLRenderer): THREE.CanvasTexture {
-  const M = 6 // run-off around the lines
-  const PX = 20
+  const M = 6
+  const PX = 16
   const cw = (L + 2 * M) * PX
   const ch = (W + 2 * M) * PX
   const c = document.createElement('canvas')
   c.width = cw
   c.height = ch
   const g = c.getContext('2d')!
-  g.fillStyle = '#3f7d34'
+  g.fillStyle = '#40803a'
   g.fillRect(0, 0, cw, ch)
   const stripes = 18
   for (let i = 0; i < stripes; i++) {
     g.fillStyle = i % 2 ? '#4a8a3c' : '#40803a'
     g.fillRect(((M + (L / stripes) * i) * PX) | 0, 0, Math.ceil((L / stripes) * PX) + 1, ch)
   }
-  // fine noise so the grass is not flat colour
-  const img = g.getImageData(0, 0, cw, ch)
+  const tile = document.createElement('canvas')
+  tile.width = tile.height = 128
+  const tg = tile.getContext('2d')!
+  const img = tg.createImageData(128, 128)
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (Math.random() - 0.5) * 14
-    img.data[i] += n * 0.6
-    img.data[i + 1] += n
-    img.data[i + 2] += n * 0.4
+    const v = Math.random() * 255
+    img.data[i] = v * 0.7
+    img.data[i + 1] = v
+    img.data[i + 2] = v * 0.5
+    img.data[i + 3] = 22
   }
-  g.putImageData(img, 0, 0)
+  tg.putImageData(img, 0, 0)
+  g.fillStyle = g.createPattern(tile, 'repeat')!
+  g.fillRect(0, 0, cw, ch)
+
   const P = (x: number, y: number): [number, number] => [(x + M) * PX, (y + M) * PX]
   g.strokeStyle = 'rgba(255,255,255,0.92)'
   g.fillStyle = 'rgba(255,255,255,0.92)'
-  g.lineWidth = 0.14 * PX
+  g.lineWidth = 0.15 * PX
   const rect = (x: number, y: number, w: number, h: number) => g.strokeRect(...P(x, y), w * PX, h * PX)
   rect(0, 0, L, W)
   g.beginPath()
@@ -856,9 +1003,9 @@ function boardTexture(): THREE.CanvasTexture {
   const g = c.getContext('2d')!
   g.fillStyle = '#101418'
   g.fillRect(0, 0, 1024, 40)
-  g.fillStyle = '#ffffff'
   g.font = '800 26px "Archivo Variable", sans-serif'
   g.textBaseline = 'middle'
+  g.fillStyle = '#ffffff'
   g.fillText('MATCHMIND', 24, 21)
   g.fillStyle = '#c6ff3d'
   g.fillText('AI CREW', 250, 21)

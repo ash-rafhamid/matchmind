@@ -11,6 +11,7 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
+import numpy as np
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -57,6 +58,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="MatchMind", version="1.0", lifespan=lifespan)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+@app.middleware("http")
+async def cache_headers(request: Request, call_next):
+    """Hashed assets never change; match data and tracking never change once simulated."""
+    response = await call_next(request)
+    path = request.url.path
+    if response.status_code == 200 and "cache-control" not in response.headers:
+        if path.startswith("/assets/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif request.method == "GET" and path.startswith("/api/matches/") and (
+            path.count("/") == 3 or path.endswith("/tracking")
+        ):
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        elif path in ("/", "/index.html"):
+            response.headers["Cache-Control"] = "no-cache"
+    return response
 app.mount("/mcp", mcp.streamable_http_app())
 
 
@@ -150,7 +168,7 @@ def match(match_id: str) -> dict:
 
 
 @app.get("/api/matches/{match_id}/tracking")
-def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int = 10) -> dict:
+def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int = 10, enc: str = "") -> dict:
     _load(match_id)
     try:
         tr = store.load_tracking(match_id)
@@ -160,12 +178,19 @@ def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int =
     step = max(1, native // max(1, min(hz, native)))
     f0 = max(0, int(start * native))
     f1 = min(tr["ball"].shape[0], int((start + min(seconds, 300)) * native))
-    xy = tr["xy"][f0:f1:step]
-    ball = tr["ball"][f0:f1:step]
-    return {"hz": native // step, "start": f0 / native, "frames": int(ball.shape[0]),
-            "players": tr["player_ids"], "teams": tr["teams"],
-            "xy": xy.reshape(-1).tolist(), "ball": ball.reshape(-1).tolist(),
-            "ball_z": tr["ball_z"][f0:f1:step].tolist(), "on_ball": tr["on_ball"][f0:f1:step].tolist(), "scale": 10}
+    xy = tr["xy"][f0:f1:step].astype(np.int32)
+    ball = tr["ball"][f0:f1:step].astype(np.int32)
+    ball_z = tr["ball_z"][f0:f1:step].astype(np.int32)
+    out = {"hz": native // step, "start": f0 / native, "frames": int(ball.shape[0]),
+           "players": tr["player_ids"], "teams": tr["teams"], "on_ball": tr["on_ball"][f0:f1:step].tolist(), "scale": 10}
+    if enc == "delta" and ball.shape[0] > 0:
+        # frame-to-frame differences are tiny integers, which compress several times better
+        out["enc"] = "delta"
+        xy = np.concatenate([xy[:1], np.diff(xy, axis=0)])
+        ball = np.concatenate([ball[:1], np.diff(ball, axis=0)])
+        ball_z = np.concatenate([ball_z[:1], np.diff(ball_z)])
+    out.update(xy=xy.reshape(-1).tolist(), ball=ball.reshape(-1).tolist(), ball_z=ball_z.tolist())
+    return out
 
 
 _inflight: dict[str, asyncio.Task] = {}
