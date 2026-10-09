@@ -837,37 +837,43 @@ export class Stadium {
       case 'goal': {
         const s = this.shots.find((x) => t >= x.ts - 2.2 && t <= x.ts + 2.0)
         const dir = s?.dir ?? (fx >= 0 ? 1 : -1)
-        pos.set(dir * (L / 2 + 34), 17, fz * 0.25 + 8)
-        look.set(dir * (L / 2 - 14), 0, fz * 0.6)
-        fov = 26
+        const box = dir * (L / 2 - 17)
+        pos.set(dir * (L / 2 + 7), 11, fz * 0.3)
+        look.set(box + (fx - box) * 0.35, 0, fz * 0.6)
+        fov = 44
         break
       }
       case 'replay': {
         const dir = this.override?.dir ?? 1
-        pos.set(dir * (L / 2 + 16), 6.5, ball.z * 0.4 + 5)
+        pos.set(dir * (L / 2 + 3.6), 2.6, Math.max(-9, Math.min(9, ball.z * 0.5)) + 2.5)
         look.set(ball.x, 1, ball.z)
-        fov = 34
+        fov = 52
         break
       }
       case 'celebrate': {
         const a = t * 0.35
-        pos.set(fx + Math.cos(a) * 22, 9, fz + Math.sin(a) * 22)
-        look.set(fx, 1.5, fz)
-        fov = 30
+        pos.set(fx + Math.cos(a) * 16, 6, fz + Math.sin(a) * 16)
+        look.set(fx, 1.2, fz)
+        fov = 40
         break
       }
       case 'follow': {
         const side = f && f.owner >= 0 ? f.teams[f.owner] : null
         const dir = side === 'away' ? -1 : 1
-        pos.set(fx - dir * 20, 9, fz + 10)
+        pos.set(fx - dir * 16, 8, fz + 9)
         look.set(fx + dir * 8, 0, fz)
-        fov = 34
+        fov = 42
         break
       }
       default: // broadcast: the main camera high in the stand, panning with play
         pos.set(fx * 0.82, 42, W / 2 + 70)
         look.set(fx * 0.95, 0, fz * 0.3 - 2)
         fov = 22
+    }
+    if (shot !== 'broadcast' && shot !== 'tactical') {
+      pos.x = Math.max(-(L / 2 + 7.5), Math.min(L / 2 + 7.5, pos.x))
+      pos.z = Math.max(-(W / 2 + 7.5), Math.min(W / 2 + 7.5, pos.z))
+      pos.y = Math.max(2, pos.y)
     }
     if (cut || this.camPos.lengthSq() === 0) {
       this.camPos.copy(pos)
