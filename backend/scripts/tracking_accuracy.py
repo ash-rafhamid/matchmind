@@ -44,6 +44,10 @@ def check(match_id: str) -> None:
             carry.append(gap(e["player"], e["ts"] + e["dur"] / 2))
 
     speed = np.linalg.norm(np.diff(tr.xy, axis=0), axis=2) * HZ
+    for e in events:  # the interval between halves is not played out; ignore that cut
+        if e["type"] == "period_start" and e["ts"] > 0:
+            f = int(round(e["ts"] * HZ))
+            speed[max(0, f - 2):f + 2] = np.nan
     valid = speed[~np.isnan(speed)]
     pct = lambda a, q: float(np.percentile(a, q))  # noqa: E731
     print(f"{match_id}: built in {built:.1f}s")
