@@ -781,14 +781,12 @@ export class Stadium {
             thighL = 0.25 * k * arc
             kneeL = 0.9 * k * arc
             pitch = 0.35 * k * arc
-            drop = 0.16 * k * arc
             armL = -0.7 * arc
             armR = 0.8 * arc
             break
           }
           case 4: // slide tackle: down on the hip, legs first
             roll = (i % 2 ? 1 : -1) * 1.2 * hold
-            drop = 0.62 * hold
             pitch = -0.4 * hold
             thighR = -1.35 * hold
             thighL = -1.0 * hold
@@ -800,20 +798,23 @@ export class Stadium {
           case 6: {
             // fouled: goes down, then gets up
             const down = Math.max(0, Math.min(1, u / 0.18, (1 - u) / 0.3))
-            pitch = 1.45 * down
-            drop = 0.72 * down
-            armL = -1.6 * down
-            armR = -1.5 * down
-            elbowL = elbowR = -0.6 * down
-            thighL = thighR = 0.1 * down
-            kneeL = kneeR = 0.3 * down
+            // flat on his front: arms out ahead, heels up
+            pitch = 1.52 * down
+            armL = -2.55 * down
+            armR = -2.25 * down
+            elbowL = -0.5 * down
+            elbowR = -0.8 * down
+            thighL = 0.05 * down
+            thighR = -0.1 * down
+            kneeL = 0.75 * down
+            kneeR = 0.35 * down
             break
           }
           case 7: // goalkeeper dive towards +y or -y of the pitch
           case 8: {
             const toward = act.kind === 7 ? 1 : -1
             roll = Math.sign(Math.sin(b.heading) || 1) * toward * 1.35 * hold
-            drop = -0.45 * arc
+            drop = -0.45 * arc // in the air
             armL = armR = -2.9 * hold
             elbowL = elbowR = -0.1
             thighL = 0.2 * hold
@@ -832,7 +833,7 @@ export class Stadium {
         }
       }
       tmpQ.setFromAxisAngle(UP, b.heading)
-      tmpB.compose(tmpV.set(x, (bob - drop) * FIG, z), tmpQ, tmpS.setScalar(FIG))
+      tmpB.compose(tmpV.set(x, 0, z), tmpQ, tmpS.setScalar(FIG))
       if (roll) tmpB.multiply(tmpM.makeRotationZ(roll))
       tmpB.multiply(tmpM.makeRotationX(pitch))
       let slot = 0
@@ -843,27 +844,60 @@ export class Stadium {
         if (rotX) m.multiply(tmpM.makeRotationX(rotX))
         return m
       }
-      P.torso.mesh.setMatrixAt(i, joint(tmpB, 0, HIP, 0))
-      P.shorts.mesh.setMatrixAt(i, joint(tmpB, 0, HIP - 0.17, 0))
-      P.neck.mesh.setMatrixAt(i, joint(tmpB, 0, HIP + 0.56, 0))
-      const head = joint(tmpB, 0, HIP + 0.69, 0)
-      P.head.mesh.setMatrixAt(i, head)
-      P.hair.mesh.setMatrixAt(i, head)
-      for (const [k, side, thigh, knee, arm, elbow] of [
-        [2 * i, -1, thighL, kneeL, armL, elbowL],
-        [2 * i + 1, 1, thighR, kneeR, armR, elbowR],
-      ] as const) {
+      const torsoM = joint(tmpB, 0, HIP, 0)
+      const shortsM = joint(tmpB, 0, HIP - 0.17, 0)
+      const neckM = joint(tmpB, 0, HIP + 0.56, 0)
+      const headM = joint(tmpB, 0, HIP + 0.69, 0)
+      const limbs = ([[-1, thighL, kneeL, armL, elbowL], [1, thighR, kneeR, armR, elbowR]] as const).map(([side, thigh, knee, arm, elbow]) => {
         const hip = joint(tmpB, side * 0.1, HIP, thigh)
-        P.thighs.mesh.setMatrixAt(k, hip)
         const shin = joint(hip, 0, -THIGH, knee)
-        P.shins.mesh.setMatrixAt(k, shin)
-        P.boots.mesh.setMatrixAt(k, shin)
         const shoulder = joint(tmpB, side * 0.245, SHOULDER, arm, side * (0.1 + 0.08 * a))
-        P.upperArms.mesh.setMatrixAt(k, shoulder)
         const fore = joint(shoulder, 0, -UPPER_ARM, elbow)
-        P.foreArms.mesh.setMatrixAt(k, fore)
-        P.hands.mesh.setMatrixAt(k, fore)
+        return { hip, shin, shoulder, fore }
+      })
+      // rest the body on the grass: find its lowest point (boots, knees, hips, chest, head, hands) and lift
+      // or lower everything so that point touches the ground - a slide or a fall lies on the pitch, not in it
+      let low = Infinity
+      const probe = (m: THREE.Matrix4, px: number, py: number, pz: number) => {
+        const y = tmpV.set(px, py, pz).applyMatrix4(m).y
+        if (y < low) low = y
       }
+      probe(torsoM, 0, 0.3, 0.13)
+      probe(torsoM, 0, 0.3, -0.13)
+      probe(torsoM, 0.22, 0.4, 0)
+      probe(torsoM, -0.22, 0.4, 0)
+      probe(shortsM, 0.2, 0.05, 0)
+      probe(shortsM, -0.2, 0.05, 0)
+      probe(shortsM, 0, 0.05, -0.14)
+      probe(headM, 0, 0.13, 0)
+      probe(headM, 0, 0, 0.11)
+      probe(headM, 0, 0, -0.11)
+      probe(headM, 0.1, 0, 0)
+      probe(headM, -0.1, 0, 0)
+      for (const l of limbs) {
+        probe(l.hip, 0, -THIGH, 0.08)
+        probe(l.shin, 0, -SHIN - 0.045, 0.17)
+        probe(l.shin, 0, -SHIN - 0.045, -0.07)
+        probe(l.shin, 0, -SHIN / 2, -0.07)
+        probe(l.fore, 0, -0.38, 0)
+        probe(l.fore, 0, 0, -0.05)
+      }
+      const lift = -low + (bob - drop) * FIG
+      for (let q = 0; q < slot; q++) POOL[q].elements[13] += lift
+      P.torso.mesh.setMatrixAt(i, torsoM)
+      P.shorts.mesh.setMatrixAt(i, shortsM)
+      P.neck.mesh.setMatrixAt(i, neckM)
+      P.head.mesh.setMatrixAt(i, headM)
+      P.hair.mesh.setMatrixAt(i, headM)
+      limbs.forEach((l, s) => {
+        const k = 2 * i + s
+        P.thighs.mesh.setMatrixAt(k, l.hip)
+        P.shins.mesh.setMatrixAt(k, l.shin)
+        P.boots.mesh.setMatrixAt(k, l.shin)
+        P.upperArms.mesh.setMatrixAt(k, l.shoulder)
+        P.foreArms.mesh.setMatrixAt(k, l.fore)
+        P.hands.mesh.setMatrixAt(k, l.fore)
+      })
     }
     for (const part of Object.values(P)) part.mesh.instanceMatrix.needsUpdate = true
 
@@ -871,7 +905,7 @@ export class Stadium {
     const prevX = this.ball.position.x
     const prevZ = this.ball.position.z
     const cam = this.camera.position
-    const bs = Math.max(0.36, Math.min(1, Math.hypot(cam.x - bx, cam.y, cam.z - bz) / 60))
+    const bs = Math.max(0.36, Math.min(0.6, Math.hypot(cam.x - bx, cam.y, cam.z - bz) / 160))
     this.ball.scale.setScalar(bs)
     this.ball.position.set(bx, BALL_R * bs + f.ballZ, bz)
     const travel = Math.hypot(bx - prevX, bz - prevZ)
