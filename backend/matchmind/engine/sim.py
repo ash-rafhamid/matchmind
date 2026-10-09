@@ -688,11 +688,14 @@ class MatchSimulator:
         mx, my = (x + end[0]) / 2, (y + end[1]) / 2
         defender = self._defender_at(side, mx, my)
         dx, dy = flip(mx, my)
-        self._advance(dur / 2)
-        if self.rng.random() < (0.025 if in_box(mx, my) else 0.3):
+        fouled = self.rng.random() < (0.025 if in_box(mx, my) else 0.3)
+        if fouled:
+            self._advance(dur / 2)
             self._foul(side, defender, mx, my)
             return
+        # The carry starts now and is stopped halfway, where the tackle happens.
         self._emit("carry", side, c, x, y, end=(mx, my), outcome="tackled", dur=dur / 2)
+        self._advance(dur / 2)
         reg = self._emit("tackle", other(side), defender, dx, dy, outcome="won")
         self._change_possession(other(side), dx, dy, defender, reg)
 
