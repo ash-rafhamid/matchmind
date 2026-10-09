@@ -129,8 +129,17 @@ def _ball_path(events: list[dict], n: int, col: dict[str, int]):
         ts, x, y, dur = e["ts"], e["x"], e["y"], max(e.get("dur", 0.0), 0.0)
         pid = col.get(e.get("player") or "")
         t = e["type"]
+        # A new action always wins: cut short whatever the ball was still doing (deflections, set-piece restarts).
+        cut = ts - 0.15 if e.get("set_piece") == "kickoff" else ts
+        while kt and kt[-1] > cut:
+            kt.pop(); kx.pop(); ky.pop(); kz.pop()
+        if e.get("set_piece") == "kickoff":
+            key(ts - 0.15, x, y)
+        nxt = ball_events[i + 1] if i + 1 < len(ball_events) else None
         if t in ("pass", "clearance") and "end_x" in e:
             ex, ey = e["end_x"], e["end_y"]
+            if nxt is not None and nxt["ts"] - (ts + dur) < 0.6 and nxt.get("set_piece") is None:
+                ex, ey = nxt["x"], nxt["y"]  # the ball goes to whoever touches it next
             length = float(np.hypot(ex - x, ey - y))
             flight = _pass_flight(e)
             release = ts + max(0.0, dur - flight)
@@ -157,6 +166,9 @@ def _ball_path(events: list[dict], n: int, col: dict[str, int]):
         elif t == "shot":
             ex, ey = e.get("end_x", PITCH_LENGTH), e.get("end_y", GOAL_Y)
             flight = _pass_flight(e)
+            if nxt is not None and nxt["type"] in ("save", "block") and nxt["ts"] < ts + 0.25 + flight + 0.6:
+                ex, ey = nxt["x"], nxt["y"]  # it stops where it is saved or blocked
+                flight = max(0.15, nxt["ts"] - ts - 0.25)
             key(ts, x, y)
             key(ts + 0.25, x, y)
             for s in np.linspace(0.2, 1.0, 5):
@@ -211,6 +223,14 @@ def _smooth(a: np.ndarray, sigma_frames: float) -> np.ndarray:
     den = np.convolve(valid.astype(float), k, mode="same")
     out = np.where(den > 1e-6, num / np.maximum(den, 1e-6), np.nan)
     out[~valid] = np.nan
+    return out
+
+
+def _smooth_pieces(a: np.ndarray, sigma_frames: float, cuts: list[int]) -> np.ndarray:
+    out = np.empty_like(a)
+    edges = [0, *cuts, len(a)]
+    for f0, f1 in zip(edges[:-1], edges[1:]):
+        out[f0:f1] = _smooth(a[f0:f1], sigma_frames)
     return out
 
 
@@ -295,11 +315,12 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
 
     # Before each kick-off everybody returns to their own half.
     own_half = np.zeros(n, dtype=bool)
+    period_starts = sorted({int(round(e["ts"] * HZ)) for e in events if e["type"] == "period_start" and e["ts"] > 0})
     prev_end = 0.0
     for e in events:
         if e["type"] in BALL_EVENTS:
             if e.get("set_piece") == "kickoff":
-                own_half[int(prev_end * HZ):int(round(e["ts"] * HZ)) + 1] = True
+                own_half[int(prev_end * HZ):int(round((e["ts"] + 0.5) * HZ)) + 1] = True
             prev_end = e["ts"] + e.get("dur", 0.0)
 
     # Lineup segments: who plays in which slot, with which width / line height, over time.
@@ -368,10 +389,11 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
         f = min(n - 1, int(round(t1 * HZ)))
         anchors[j].append((t1, *feet(float(bx[f]), float(by[f]), sides[j])))
 
-    shape_path = _follow(targets, np.array(pace))
+    shape_path = _follow(targets, np.array(pace), period_starts)
     xy = np.empty((n, P, 2))
     for j in range(P):
-        path = np.stack([_smooth(shape_path[:, j, 0], 4), _smooth(shape_path[:, j, 1], 4)], axis=1)
+        path = np.stack([_smooth_pieces(shape_path[:, j, 0], 4, period_starts),
+                         _smooth_pieces(shape_path[:, j, 1], 4, period_starts)], axis=1)
         hard = _apply_anchors(path, anchors[j], n)
         # Pressing runs are optional: keep one only if the player could physically get there in time
         # and it does not collide with an action of their own.
@@ -406,8 +428,11 @@ def build_tracking(events: list[dict], home: Team, away: Team, end_ts: float, se
                     bz.astype(np.float32), owner, vmax)
 
 
-def _follow(targets: np.ndarray, pace: np.ndarray) -> np.ndarray:
-    """Players move towards their shape targets like athletes: capped speed and acceleration."""
+def _follow(targets: np.ndarray, pace: np.ndarray, resets: list[int]) -> np.ndarray:
+    """Players move towards their shape targets like athletes: capped speed and acceleration.
+
+    At `resets` (the start of a half, after the interval) everyone starts in their kick-off position."""
+    resets_set = set(resets)
     n, P, _ = targets.shape
     vcap = 4.2 + 3.0 * pace / 100  # a team keeps its shape at a jog-to-run, not a sprint
     acc = 2.8 * DT
@@ -419,6 +444,8 @@ def _follow(targets: np.ndarray, pace: np.ndarray) -> np.ndarray:
         tgt = targets[f]
         on = ~np.isnan(tgt[:, 0])
         new = on & ~was_on  # just came on: start in place
+        if f in resets_set:
+            new = on
         pos[new] = tgt[new]
         vel[new] = 0.0
         desired = np.where(on[:, None], (tgt - pos) * 1.1, 0.0)

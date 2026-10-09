@@ -164,7 +164,8 @@ def tracking(match_id: str, start: float = 0.0, seconds: float = 60.0, hz: int =
     ball = tr["ball"][f0:f1:step]
     return {"hz": native // step, "start": f0 / native, "frames": int(ball.shape[0]),
             "players": tr["player_ids"], "teams": tr["teams"],
-            "xy": xy.reshape(-1).tolist(), "ball": ball.reshape(-1).tolist(), "scale": 10}
+            "xy": xy.reshape(-1).tolist(), "ball": ball.reshape(-1).tolist(),
+            "ball_z": tr["ball_z"][f0:f1:step].tolist(), "on_ball": tr["on_ball"][f0:f1:step].tolist(), "scale": 10}
 
 
 _inflight: dict[str, asyncio.Task] = {}

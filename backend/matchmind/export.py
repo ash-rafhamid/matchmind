@@ -25,7 +25,7 @@ Competition: {competition}. Every club, player and event is synthetic; free to u
 | File | Content |
 |---|---|
 | `events.csv` / `events.json` | {n_events} events: passes, carries, shots, tackles, interceptions, pressures, fouls, cards, set pieces, substitutions, tactical changes |
-| `tracking_10hz.npz` | 10 Hz positions: `xy` (frames x players x 2, int16 decimetres, -1 = not on the pitch), `ball` (frames x 2), `player_ids`, `teams` |
+| `tracking_10hz.npz` | 10 Hz positions: `xy` (frames x players x 2, int16 decimetres, -1 = not on the pitch), `ball` (frames x 2), `ball_z` (ball height, dm), `on_ball` (column of the player in control, -1 in flight), `player_ids`, `teams` |
 | `tracking_2hz.csv` | The same tracking down-sampled to 2 Hz in metres, one row per frame |
 | `meta.json` | Teams, tactical DNA, squads with attributes, lineups, period lengths |
 | `analytics.json` | Team and player stats, momentum, xG timeline, pass networks, detected key moments |
@@ -43,8 +43,8 @@ Competition: {competition}. Every club, player and event is synthetic; free to u
 ## How it was generated
 An event-level simulator walks the ball through the match; action probabilities depend on pitch location, opponent
 pressure, both teams' tactical dials (press, tempo, directness, width, line height, counter) and player attributes.
-Tracking is reconstructed from the events with a team-shape model, lagged ball perception, pressing runs and
-pace/acceleration limits. Averages over 400 simulated matches are calibrated to top-flight football (per team:
+Tracking is anchored to the events: the passer is at the ball when it is struck, the receiver where it arrives, the
+dribbler keeps it at their feet; between actions players follow the team shape with speed and acceleration limits. Averages over 400 simulated matches are calibrated to top-flight football (per team:
 ~13.7 shots, 1.6 xG, 80% pass accuracy, 11 fouls, 5 corners; ~10-11 km and 27-32 km/h top speed per player).
 """
 

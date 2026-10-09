@@ -4,7 +4,7 @@ A package is everything the app and the agents need for one match:
   meta.json       teams, lineups, tactical DNA, result
   events.json     the full event stream (absolute frame)
   analytics.json  team/player stats, momentum, xG timeline, pass networks, moments
-  tracking.npz    10 Hz positions as int16 decimetres (-1 = off the pitch)
+  tracking.npz    10 Hz positions as int16 decimetres (-1 = off the pitch), ball height (dm), ball owner column
 """
 
 from __future__ import annotations
@@ -95,7 +95,9 @@ def generate(home: str, away: str, seed: int, script: list[TacticalChange] | Non
         if tracking is not None:
             xy = np.where(np.isnan(tracking.xy), -1, np.round(tracking.xy * 10)).astype(np.int16)
             ball = np.round(tracking.ball * 10).astype(np.int16)
-            np.savez_compressed(folder / "tracking.npz", xy=xy, ball=ball, player_ids=np.array(tracking.player_ids),
+            ball_z = np.round(tracking.ball_z * 10).astype(np.int16)
+            np.savez_compressed(folder / "tracking.npz", xy=xy, ball=ball, ball_z=ball_z,
+                                on_ball=tracking.on_ball.astype(np.int8), player_ids=np.array(tracking.player_ids),
                                 teams=np.array(tracking.teams))
     return pkg
 
@@ -162,5 +164,8 @@ def load(mid: str) -> dict:
 @lru_cache(maxsize=4)
 def load_tracking(mid: str) -> dict:
     data = np.load(DATA_DIR / mid / "tracking.npz")
-    return {"xy": data["xy"], "ball": data["ball"], "player_ids": [str(p) for p in data["player_ids"]],
-            "teams": [str(t) for t in data["teams"]]}
+    n = data["ball"].shape[0]
+    return {"xy": data["xy"], "ball": data["ball"],
+            "ball_z": data["ball_z"] if "ball_z" in data else np.zeros(n, dtype=np.int16),
+            "on_ball": data["on_ball"] if "on_ball" in data else np.full(n, -1, dtype=np.int8),
+            "player_ids": [str(p) for p in data["player_ids"]], "teams": [str(t) for t in data["teams"]]}
