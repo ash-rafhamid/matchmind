@@ -21,6 +21,7 @@ captured by middleware and becomes the fact base for checking the answer.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import time
@@ -296,15 +297,23 @@ class Crew:
             job.trace.append({"agent": "Producer", "kind": "rules", "output": "No AI model configured - "
                               "template narration", "ms": 0})
             return _template(job)
-        try:
-            result = await self._workflow().run(job)
-            outputs = result.get_outputs()
-            if outputs:
-                return outputs[-1]
-            job.trace.append({"agent": "Producer", "kind": "rules", "output": "workflow produced no output", "ms": 0})
-        except Exception as exc:  # model outage, quota, network: degrade, never break the demo
-            job.trace.append({"agent": "Producer", "kind": "rules", "output": f"AI unavailable "
-                              f"({type(exc).__name__}: {str(exc)[:200]}) - using verified template", "ms": 0})
+        for attempt in range(3):
+            try:
+                result = await self._workflow().run(job)
+                outputs = result.get_outputs()
+                if outputs:
+                    return outputs[-1]
+                job.trace.append({"agent": "Producer", "kind": "rules", "output": "workflow produced no output",
+                                  "ms": 0})
+                break
+            except Exception as exc:  # model outage, quota, network: degrade, never break the demo
+                if "RateLimit" in type(exc).__name__ or "429" in str(exc):
+                    if attempt < 2:
+                        await asyncio.sleep(4 * (attempt + 1))
+                        continue
+                job.trace.append({"agent": "Producer", "kind": "rules", "output": f"AI unavailable "
+                                  f"({type(exc).__name__}: {str(exc)[:200]}) - using verified template", "ms": 0})
+                break
         return _template(job)
 
     # ------------------------------------------------------------ Q&A
