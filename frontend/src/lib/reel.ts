@@ -145,7 +145,7 @@ export class ReelDirector {
     const n = this.clips[this.idx + 1]
     if (n) this.store.prefetch(n.start)
     const c = this.clips[this.idx]
-    if (c?.goal) this.store.prefetch(c.goal.ts - 7)
+    if (c?.goal) this.store.prefetch(c.goal.ts - 5)
   }
 
   private onTick = () => {
@@ -162,7 +162,7 @@ export class ReelDirector {
     if (this.phase === 'clip' && t >= c.end - 0.05) {
       if (c.goal) this.replay(c.goal)
       else this.cut()
-    } else if (this.phase === 'replay' && c.goal && t >= c.goal.ts + 1.2) {
+    } else if (this.phase === 'replay' && c.goal && t >= c.goal.ts + 1.0) {
       this.cut()
     }
   }
@@ -173,9 +173,9 @@ export class ReelDirector {
     this.clock.pause()
     this.emit()
     this.timer = window.setTimeout(() => {
-      this.go(goal.ts - 6.5)
+      this.go(goal.ts - 4.5)
       this.phase = 'replay'
-      this.clock.setSpeed(0.4)
+      this.clock.setSpeed(0.5)
       this.clock.play()
       this.emit()
     }, 700)
