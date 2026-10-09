@@ -247,5 +247,10 @@
  "reel.second_half": "Segunda parte",
  "reel.fulltime": "Final del partido",
  "reel.restart": "Reiniciar en",
- "reel.next": "Siguiente jugada"
+ "reel.next": "Siguiente jugada",
+ "cam.celebrate": "Cámara celebración",
+ "voice.on": "Comentario activado",
+ "voice.off": "Comentario desactivado",
+ "home.crewLive": "Comentario AI",
+ "home.factChecked": "Verificado por código"
 }

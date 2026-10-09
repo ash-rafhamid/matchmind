@@ -143,6 +143,57 @@
     animation: fade-in 0.4s ease both;
   }
 
+  /* camera change: a quick dip, a light sweeping across, and the camera's name */
+  .cam-flash {
+    background: rgba(11, 12, 14, 0.5);
+    animation: cam-flash 0.45s ease-out both;
+  }
+
+  @keyframes cam-flash {
+    to {
+      opacity: 0;
+    }
+  }
+
+  .cam-sweep {
+    left: 0;
+    width: 4px;
+    background: var(--color-volt);
+    box-shadow: 0 0 28px 4px var(--color-volt);
+    animation: cam-sweep 0.45s cubic-bezier(0.7, 0, 0.2, 1) both;
+  }
+
+  @keyframes cam-sweep {
+    from {
+      left: -4px;
+      opacity: 1;
+    }
+    to {
+      left: 100%;
+      opacity: 0.2;
+    }
+  }
+
+  .cam-chip {
+    animation: cam-chip 1.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  @keyframes cam-chip {
+    0% {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.96);
+    }
+    12%,
+    78% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
   @keyframes fade-in {
     from {
       opacity: 0;

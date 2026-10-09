@@ -16,6 +16,8 @@ export interface Clip {
   title: string
   clock: string
   goal?: MatchEvent
+  /** The analytics moment this clip shows, if any (for the crew's commentary). */
+  moment?: string
 }
 
 export type ReelPhase = 'off' | 'clip' | 'cut' | 'replay' | 'done'
@@ -40,7 +42,7 @@ export function buildReel(pkg: MatchPackage): Clip[] {
   for (const m of pkg.analytics.moments) {
     if (!MOMENT_TYPES.has(m.type)) continue
     const goal = m.type === 'goal' ? goals.find((g) => Math.abs(g.ts - m.ts) < 4) : undefined
-    raw.push({ start: m.ts - 16, end: m.ts + (goal ? 5 : 6), kind: m.type, team: m.team, title: m.title, clock: m.clock, goal })
+    raw.push({ start: m.ts - 16, end: m.ts + (goal ? 5 : 6), kind: m.type, team: m.team, title: m.title, clock: m.clock, goal, moment: m.id })
   }
   for (const e of pkg.events) {
     if (e.type === 'shot' && (e.xg ?? 0) >= 0.15 && e.outcome !== 'goal')
@@ -58,7 +60,8 @@ export function buildReel(pkg: MatchPackage): Clip[] {
     if (last && c.start <= last.end + 5 && !(last.goal && c.goal)) {
       last.end = Math.max(last.end, c.end)
       if (c.goal) last.goal = c.goal
-      if (rank(c.kind) > rank(last.kind)) Object.assign(last, { kind: c.kind, team: c.team, title: c.title, clock: c.clock })
+      if (rank(c.kind) > rank(last.kind)) Object.assign(last, { kind: c.kind, team: c.team, title: c.title, clock: c.clock, moment: c.moment ?? last.moment })
+      else if (!last.moment && c.moment) last.moment = c.moment
     } else out.push({ ...c })
   }
   return out

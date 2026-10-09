@@ -247,5 +247,10 @@
  "reel.second_half": "Zweite Halbzeit",
  "reel.fulltime": "Abpfiff",
  "reel.restart": "Neu starten bei",
- "reel.next": "Nächstes Highlight"
+ "reel.next": "Nächstes Highlight",
+ "cam.celebrate": "Feier-Kamera",
+ "voice.on": "Kommentar an",
+ "voice.off": "Kommentar aus",
+ "home.crewLive": "KI-Kommentar",
+ "home.factChecked": "Vom Code geprüft"
 }

@@ -247,5 +247,10 @@
  "reel.second_half": "দ্বিতীয়ার্ধ",
  "reel.fulltime": "পূর্ণ সময়",
  "reel.restart": "পুনরায় শুরু",
- "reel.next": "পরবর্তী হাইলাইট"
+ "reel.next": "পরবর্তী হাইলাইট",
+ "cam.celebrate": "উৎসব ক্যাম",
+ "voice.on": "কমেন্টারি চালু",
+ "voice.off": "কমেন্টারি বন্ধ",
+ "home.crewLive": "এআই কমেন্টারি",
+ "home.factChecked": "কোড দ্বারা যাচাই"
 }

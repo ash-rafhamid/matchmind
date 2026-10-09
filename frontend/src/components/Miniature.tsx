@@ -13,23 +13,27 @@ interface Props {
   /** Direction of the goal being replayed (1 = right), or null when not replaying. */
   replay?: 1 | -1 | null
   crowd?: boolean
+  /** Let the AI director tour every camera angle between the big moments (front page). */
+  tour?: boolean
+  onCut?: (shot: string) => void
   className?: string
 }
 
 /** React shell around the three.js stadium. The scene runs its own render loop off the playback clock. */
-export default function Miniature({ pkg, store, clock, mode, highlights = [], replay = null, crowd = true, className = '' }: Props) {
+export default function Miniature({ pkg, store, clock, mode, highlights = [], replay = null, crowd = true, tour = false, onCut, className = '' }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const stadium = useRef<Stadium | null>(null)
-  const latest = useRef({ mode, highlights, replay })
-  latest.current = { mode, highlights, replay }
+  const latest = useRef({ mode, highlights, replay, tour, onCut })
+  latest.current = { mode, highlights, replay, tour, onCut }
 
   useEffect(() => {
     const names = pkg.meta.player_names
-    const s = new Stadium(host.current!, pkg, store, clock, { name: (pid) => names[pid] ?? pid, crowd })
+    const s = new Stadium(host.current!, pkg, store, clock, { name: (pid) => names[pid] ?? pid, crowd, onCut: (shot) => latest.current.onCut?.(shot) })
     // apply whatever the page asked for before the stadium existed
     s.setMode(latest.current.mode)
     s.setHighlights(latest.current.highlights)
     s.setReplay(latest.current.replay)
+    s.setTour(latest.current.tour)
     stadium.current = s
     if (window.location.search.includes('debug')) (window as unknown as { __mm: unknown }).__mm = { clock, store, stadium: s }
     return () => {
@@ -41,6 +45,7 @@ export default function Miniature({ pkg, store, clock, mode, highlights = [], re
   useEffect(() => stadium.current?.setMode(mode), [mode])
   useEffect(() => stadium.current?.setHighlights(highlights), [highlights])
   useEffect(() => stadium.current?.setReplay(replay), [replay])
+  useEffect(() => stadium.current?.setTour(tour), [tour])
 
   return <div ref={host} className={`relative h-full w-full overflow-hidden ${className}`} aria-label="Live 3D reconstruction of the match" role="img" />
 }

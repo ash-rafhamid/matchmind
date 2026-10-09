@@ -247,5 +247,10 @@
  "reel.second_half": "Second half",
  "reel.fulltime": "Full time",
  "reel.restart": "Restart at",
- "reel.next": "Next highlight"
+ "reel.next": "Next highlight",
+ "cam.celebrate": "Celebration cam",
+ "voice.on": "Commentary on",
+ "voice.off": "Commentary off",
+ "home.crewLive": "AI commentary",
+ "home.factChecked": "Fact-checked by code"
 }

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import AskPanel from '../components/AskPanel'
-import { CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, RestartCut, ScoreBug, Transport, useAtmosphere, useCrossings, type PlayMode } from '../components/Broadcast'
+import { CamCut, CameraSwitch, GoalTakeover, LowerThird, ReelOverlay, RestartCut, ScoreBug, Transport, useAtmosphere, useCamCut, useCrossings, type PlayMode } from '../components/Broadcast'
 import CrewFeed from '../components/CrewFeed'
 import RecapPanel from '../components/RecapPanel'
 import StatsPanel from '../components/StatsPanel'
@@ -47,6 +47,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   const [highlight, setHighlight] = useState<number[]>([])
   const [tab, setTab] = useState<Tab>('live')
   const [cam, setCam] = useState<CameraMode>('director')
+  const { cut: camCut, onCut, pick: pickCam } = useCamCut(setCam)
   const [lower, setLower] = useState<Moment | null>(null)
   const [goal, setGoal] = useState<MatchEvent | null>(null)
   const [focusMoment, setFocusMoment] = useState<string | null>(null)
@@ -94,6 +95,22 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
     }
   }
   useEffect(() => () => atm.current?.close(), [])
+  // the crew's commentary read aloud when a moment comes up (on by default)
+  const [voice, setVoiceState] = useState(() => {
+    try {
+      return localStorage.getItem('mm.voice') !== '0'
+    } catch {
+      return true
+    }
+  })
+  const setVoice = (on: boolean) => {
+    setVoiceState(on)
+    try {
+      localStorage.setItem('mm.voice', on ? '1' : '0')
+    } catch {
+      /* private mode */
+    }
+  }
 
   // full match: cut dead-ball stretches like TV, straight to just before the restart
   const skips = useMemo(() => buildSkips(pkg), [pkg])
@@ -189,15 +206,16 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
         <section id="stage" className="relative flex min-h-[560px] flex-col bg-ink xl:min-h-0">
           <div className="relative min-h-[340px] flex-1">
             <Suspense fallback={<p className="working absolute inset-0 grid place-items-center cond text-volt">{t('app.loadingStadium')}</p>}>
-              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} replay={replayDir} className="absolute inset-0" />
+              <Miniature pkg={pkg} store={store} clock={clock} mode={cam} highlights={highlightEvents} replay={replayDir} onCut={onCut} className="absolute inset-0" />
             </Suspense>
             <div className="stage-shade pointer-events-none absolute inset-0" />
+            <CamCut cut={camCut} />
             <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
               <div className="pointer-events-auto">
                 <ScoreBug />
               </div>
               <div className="pointer-events-auto flex flex-col items-end gap-2">
-                <CameraSwitch mode={cam} onMode={setCam} />
+                <CameraSwitch mode={cam} onMode={pickCam} />
                 {highlight.length > 0 && (
                   <button onClick={() => setHighlight([])} className="cut-both bg-flare px-3 py-1 cond text-[11px] text-white">
                     {t('match.clearMarkers')}
@@ -222,6 +240,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
                 <LowerThird
                   key={lower.id}
                   moment={lower}
+                  voice={voice}
                   onDone={() => setLower(null)}
                   onOpen={() => {
                     setTab('live')
@@ -231,7 +250,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
               )}
             </div>
           </div>
-          <Transport mode={mode} onMode={setMode} onPlay={onPlay} reel={reel} sound={sound} onSound={() => setSound(!sound)} />
+          <Transport mode={mode} onMode={setMode} onPlay={onPlay} reel={reel} sound={sound} onSound={() => setSound(!sound)} voice={voice} onVoice={() => setVoice(!voice)} />
         </section>
 
         <aside className="plate flex min-h-[640px] min-w-0 flex-col xl:min-h-0">
