@@ -204,3 +204,30 @@ export class ReelDirector {
     }, 900)
   }
 }
+
+export interface Skip {
+  from: number
+  to: number
+  restart: MatchEvent
+}
+
+const BALL = new Set(['pass', 'carry', 'shot', 'interception', 'tackle', 'save', 'clearance', 'block'])
+
+/**
+ * Dead-ball stretches worth cutting, the way TV does: keep a few seconds (a little longer
+ * after a goal, for the celebration), then cut to just before the restart.
+ */
+export function buildSkips(pkg: MatchPackage): Skip[] {
+  const ball = pkg.events.filter((e) => BALL.has(e.type))
+  const out: Skip[] = []
+  for (let i = 0; i + 1 < ball.length; i++) {
+    const a = ball[i]
+    const b = ball[i + 1]
+    const end = a.ts + (a.dur ?? 0)
+    const keep = a.type === 'shot' && a.outcome === 'goal' ? 8 : 3.5
+    const from = end + keep
+    const to = b.ts - 3
+    if (to - from > 3) out.push({ from, to, restart: b })
+  }
+  return out
+}

@@ -164,12 +164,22 @@ export class TrackingStore {
       out.x[j] = cr(x0, x1, x2, x3, a) / s
       out.y[j] = cr(y0, y1, y2, y3, a) / s
     }
+    const b0 = f0 * 2
     const b1 = f1 * 2
     const b2 = f2 * 2
-    const bcut = Math.hypot(c.ball[b2] - c.ball[b1], c.ball[b2 + 1] - c.ball[b1 + 1]) / s > CUT * 1.5
-    const wb = bcut ? (a < 0.5 ? 0 : 1) : a
-    out.ball[0] = (c.ball[b1] + (c.ball[b2] - c.ball[b1]) * wb) / s
-    out.ball[1] = (c.ball[b1 + 1] + (c.ball[b2 + 1] - c.ball[b1 + 1]) * wb) / s
+    const b3 = f3 * 2
+    const B = c.ball
+    const far = (i: number, k: number) => Math.hypot(B[i] - B[k], B[i + 1] - B[k + 1]) / s > CUT * 1.5
+    if (far(b2, b1)) {
+      const k = a < 0.5 ? b1 : b2
+      out.ball[0] = B[k] / s
+      out.ball[1] = B[k + 1] / s
+    } else {
+      const p0 = far(b0, b1) ? b1 : b0
+      const p3 = far(b3, b2) ? b2 : b3
+      out.ball[0] = cr(B[p0], B[b1], B[b2], B[p3], a) / s
+      out.ball[1] = cr(B[p0 + 1], B[b1 + 1], B[b2 + 1], B[p3 + 1], a) / s
+    }
     out.ballZ = c.ballZ.length ? (c.ballZ[f1] + (c.ballZ[f2] - c.ballZ[f1]) * a) / s : 0
     out.owner = c.owner.length ? c.owner[a < 0.5 ? f1 : f2] : -1
     return out

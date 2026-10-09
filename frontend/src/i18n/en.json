@@ -245,5 +245,6 @@
  "reel.kickoff": "Kick-off",
  "reel.chance": "Chance",
  "reel.second_half": "Second half",
- "reel.fulltime": "Full time"
+ "reel.fulltime": "Full time",
+ "reel.restart": "Restart"
 }

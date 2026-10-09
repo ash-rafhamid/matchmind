@@ -245,5 +245,6 @@
  "reel.kickoff": "Anpfiff",
  "reel.chance": "Chance",
  "reel.second_half": "Zweite Halbzeit",
- "reel.fulltime": "Abpfiff"
+ "reel.fulltime": "Abpfiff",
+ "reel.restart": "Neu starten"
 }

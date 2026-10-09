@@ -245,5 +245,6 @@
  "reel.kickoff": "Saque inicial",
  "reel.chance": "Oportunidad",
  "reel.second_half": "Segunda parte",
- "reel.fulltime": "Final del partido"
+ "reel.fulltime": "Final del partido",
+ "reel.restart": "Reiniciar"
 }
