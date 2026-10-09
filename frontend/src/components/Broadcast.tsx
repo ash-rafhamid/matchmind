@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { formatClock, useClock } from '../lib/clock'
 import { lastEventIndex, scoreAt, useMatch } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
+import { speak, speechAvailable, stopSpeaking } from '../lib/speech'
 import { momentTitle, onPrimary, surname } from '../lib/ui'
 import type { ReelState } from '../lib/reel'
 import type { Atmosphere } from '../lib/sound'
@@ -55,10 +56,64 @@ export function CameraSwitch({ mode, onMode }: { mode: CameraMode; onMode: (m: C
     <div className="seg cut-both pl-2 shadow-[0_6px_24px_rgba(0,0,0,0.3)]" role="group" aria-label="Camera">
       <span className="hidden cond self-center pe-2 ps-1 text-[11px] text-ink-3 sm:inline">{t('match.camera')}</span>
       {CAMS.map((m) => (
-        <button key={m} aria-pressed={mode === m} onClick={() => onMode(m)}>
+        <button key={m} aria-pressed={mode === m} onClick={() => onMode(m)} className="transition-transform active:scale-90">
           {t(`cam.${m}`)}
         </button>
       ))}
+    </div>
+  )
+}
+
+export interface CamCutState {
+  shot: string
+  n: number
+  /** Picked by the viewer (full stinger), or cut by the AI director (just the name). */
+  strong: boolean
+}
+
+/** Camera changes made visible: the viewer's own picks get a stinger and a little buzz on phones. */
+export function useCamCut(setCam: (m: CameraMode) => void) {
+  const [cut, setCut] = useState<CamCutState | null>(null)
+  const picked = useRef(0)
+  const onCut = useCallback((shot: string) => {
+    if (performance.now() - picked.current < 600) return
+    setCut((c) => ({ shot, n: (c?.n ?? 0) + 1, strong: false }))
+  }, [])
+  const pick = useCallback(
+    (m: CameraMode) => {
+      picked.current = performance.now()
+      setCam(m)
+      setCut((c) => ({ shot: m, n: (c?.n ?? 0) + 1, strong: true }))
+      try {
+        if (window.matchMedia('(pointer: coarse)').matches) navigator.vibrate?.(12)
+      } catch {
+        /* no vibration */
+      }
+    },
+    [setCam],
+  )
+  return { cut, onCut, pick }
+}
+
+/** A broadcast stinger when the camera changes: a quick dip with a sweep, and the camera's name. */
+export function CamCut({ cut }: { cut: CamCutState | null }) {
+  const t = useT()
+  if (!cut || cut.shot === 'replay') return null
+  const label = t(`cam.${cut.shot}`)
+  return (
+    <div key={cut.n} className="pointer-events-none absolute inset-0 z-[6] overflow-hidden">
+      {cut.strong && (
+        <>
+          <div className="cam-flash absolute inset-0" />
+          <div className="cam-sweep absolute inset-y-0" />
+        </>
+      )}
+      <div className="absolute inset-x-0 top-[24%] flex justify-center">
+        <div className="cam-chip flex items-stretch shadow-[0_8px_30px_rgba(0,0,0,0.35)]">
+          <span className="cut-l flex items-center bg-volt ps-4 pe-2 cond text-ink">● {t('match.camera')}</span>
+          <span className="cut-r flex items-center bg-ink pe-5 ps-2 xp text-[15px] text-white">{label}</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -79,22 +134,46 @@ export function useCrossings(events: MatchEvent[] | Moment[], onCross: (e: Match
 }
 
 /** Broadcast lower third: the crew's verified take on the moment that just happened. */
-export function LowerThird({ moment, onDone, onOpen }: { moment: Moment; onDone: () => void; onOpen: () => void }) {
-  const { pkg } = useMatch()
+export function LowerThird({ moment, onDone, onOpen, voice = false }: { moment: Moment; onDone: () => void; onOpen: () => void; voice?: boolean }) {
+  const { pkg, clock } = useMatch()
   const { persona, lang, t } = useSettings()
   const [story, setStory] = useState<CrewResult | null>(null)
   const team = pkg.meta.teams[moment.team]
   const isGoal = moment.type === 'goal'
+  const done = useRef(onDone)
+  done.current = onDone
+  const speaking = voice && speechAvailable
 
   useEffect(() => {
     let alive = true
     api.story(pkg.meta.id, moment.id, persona, lang).then((s) => alive && setStory(s)).catch(() => undefined)
-    const t = window.setTimeout(onDone, 14000)
+    const t = window.setTimeout(() => done.current(), speaking ? 45000 : 14000)
     return () => {
       alive = false
       clearTimeout(t)
     }
-  }, [pkg.meta.id, moment.id, persona, lang, onDone])
+  }, [pkg.meta.id, moment.id, persona, lang, speaking])
+
+  // commentary voice: read the crew's line out, pausing with the match
+  useEffect(() => {
+    if (!speaking || !story) return
+    let after = 0
+    speak(story.text, lang, () => {
+      after = window.setTimeout(() => done.current(), 1500)
+    })
+    let was = clock.playing
+    const off = clock.subscribe(() => {
+      if (clock.playing === was) return
+      was = clock.playing
+      if (was) window.speechSynthesis.resume()
+      else window.speechSynthesis.pause()
+    })
+    return () => {
+      off()
+      clearTimeout(after)
+      stopSpeaking()
+    }
+  }, [speaking, story, lang, clock])
 
   return (
     <div className="wipe-up pointer-events-auto max-w-[760px] shadow-[0_10px_40px_rgba(0,0,0,0.35)]">
@@ -157,10 +236,12 @@ interface TransportProps {
   reel: ReelState
   sound: boolean
   onSound: () => void
+  voice?: boolean
+  onVoice?: () => void
 }
 
 /** Bottom bar of the stage: highlights or the full match, play, speed, sound, the timeline, and what is happening now. */
-export function Transport({ mode, onMode, onPlay, reel, sound, onSound }: TransportProps) {
+export function Transport({ mode, onMode, onPlay, reel, sound, onSound, voice = false, onVoice }: TransportProps) {
   const { pkg, clock, name } = useMatch()
   const { time, playing, speed } = useClock(clock, 6)
   const t = useT()
@@ -194,6 +275,11 @@ export function Transport({ mode, onMode, onPlay, reel, sound, onSound }: Transp
         <button className={`act ${sound ? '!text-ink' : ''}`} onClick={onSound} aria-pressed={sound}>
           {sound ? '🔊' : '🔈'} {sound ? t('sound.on') : t('sound.off')}
         </button>
+        {onVoice && speechAvailable && (
+          <button className={`act ${voice ? '!text-ink' : ''}`} onClick={onVoice} aria-pressed={voice}>
+            🎙 {voice ? t('voice.on') : t('voice.off')}
+          </button>
+        )}
         <div className="ms-auto flex min-h-[22px] items-center gap-2 text-[13px]">
           {clock.buffering ? (
             <span className="working cond text-ink-3">{t('buffering')}</span>

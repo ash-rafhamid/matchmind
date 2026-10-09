@@ -247,5 +247,10 @@
  "reel.second_half": "Deuxième mi-temps",
  "reel.fulltime": "Fin du match",
  "reel.restart": "Reprendre à",
- "reel.next": "Moment fort suivant"
+ "reel.next": "Moment fort suivant",
+ "cam.celebrate": "Caméra célébration",
+ "voice.on": "Commentaire activé",
+ "voice.off": "Commentaire désactivé",
+ "home.crewLive": "Commentaire IA",
+ "home.factChecked": "Vérifié par code"
 }

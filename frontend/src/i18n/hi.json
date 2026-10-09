@@ -247,5 +247,10 @@
  "reel.second_half": "दूसरा हाफ",
  "reel.fulltime": "फुल टाइम",
  "reel.restart": "पर शुरू करें",
- "reel.next": "अगला हाइलाइट"
+ "reel.next": "अगला हाइलाइट",
+ "cam.celebrate": "जश्न कैम",
+ "voice.on": "टिप्पणी चालू",
+ "voice.off": "टिप्पणी बंद",
+ "home.crewLive": "AI कमेंट्री",
+ "home.factChecked": "कोड से सत्यापित"
 }

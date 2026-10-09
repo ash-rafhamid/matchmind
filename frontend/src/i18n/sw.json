@@ -247,5 +247,10 @@
  "reel.second_half": "Nusu ya pili",
  "reel.fulltime": "Muda umeisha",
  "reel.restart": "Anzisha tena saa",
- "reel.next": "Mambo yanayofuata"
+ "reel.next": "Mambo yanayofuata",
+ "cam.celebrate": "Kamera ya sherehe",
+ "voice.on": "Maoni wameshika",
+ "voice.off": "Maoni yamezimwa",
+ "home.crewLive": "Maoni ya AI",
+ "home.factChecked": "Imethibitishwa na msimbo"
 }

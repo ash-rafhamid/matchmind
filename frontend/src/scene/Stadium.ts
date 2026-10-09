@@ -62,6 +62,8 @@ interface Shot {
 export interface StadiumOptions {
   name: (pid: string) => string
   crowd?: boolean
+  /** Called whenever the camera cuts to a different shot (not on the very first frame). */
+  onCut?: (shot: string) => void
 }
 
 /** One body part for all players, drawn in a single call. */
@@ -84,6 +86,16 @@ const PAIRED: PartName[] = ['thighs', 'shins', 'boots', 'upperArms', 'foreArms',
 function lathe(profile: [number, number][], segments = 16): THREE.BufferGeometry {
   return new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), segments)
 }
+
+const TOUR: ['broadcast' | 'follow' | 'tactical' | 'goal', number][] = [
+  ['broadcast', 9],
+  ['follow', 7],
+  ['broadcast', 7],
+  ['tactical', 6],
+  ['broadcast', 7],
+  ['goal', 6],
+]
+const TOUR_LENGTH = TOUR.reduce((a, [, d]) => a + d, 0)
 
 const tmpM = new THREE.Matrix4()
 const tmpB = new THREE.Matrix4()
@@ -142,6 +154,7 @@ export class Stadium {
   private goalsIn: { side: Side; from: number }[]
 
   private mode: CameraMode = 'director'
+  private tour = false
   private override: { shot: 'replay'; dir: 1 | -1 } | null = null
   private camPos = new THREE.Vector3()
   private camLook = new THREE.Vector3()
@@ -226,6 +239,12 @@ export class Stadium {
 
   setMode(mode: CameraMode) {
     this.mode = mode
+    this.idleFrames = 0
+  }
+
+  /** The front page's AI director also tours the other angles between the big moments. */
+  setTour(on: boolean) {
+    this.tour = on
     this.idleFrames = 0
   }
 
@@ -998,10 +1017,18 @@ export class Stadium {
 
   // ------------------------------------------------------------------ the director
 
-  private directorShot(t: number): 'broadcast' | 'goal' | 'celebrate' {
+  private directorShot(t: number): 'broadcast' | 'goal' | 'celebrate' | 'follow' | 'tactical' {
     for (const s of this.shots) {
       if (t >= s.ts - 2.2 && t <= s.ts + 2.0) return 'goal'
       if (s.goal && t > s.ts + 2.0 && t < s.ts + 8) return 'celebrate'
+    }
+    if (this.tour) {
+      // between the big moments: the main camera, then closer and wider angles in turn
+      let k = (performance.now() / 1000) % TOUR_LENGTH
+      for (const [shot, d] of TOUR) {
+        if (k < d) return shot === 'goal' && Math.abs(this.focus.x) < 25 ? 'broadcast' : shot
+        k -= d
+      }
     }
     return 'broadcast'
   }
@@ -1014,8 +1041,10 @@ export class Stadium {
     const fx = this.focus.x
     const fz = this.focus.z
     const shot = this.override ? this.override.shot : this.mode === 'director' ? this.directorShot(t) : this.mode
-    const cut = shot !== this.lastCut
+    const prev = this.lastCut
+    const cut = shot !== prev
     this.lastCut = shot
+    if (cut && prev) this.opts.onCut?.(shot)
 
     const pos = tmpV
     const look = tmpLook
@@ -1078,7 +1107,11 @@ export class Stadium {
     }
     this.camera.position.copy(this.camPos)
     this.camera.lookAt(this.camLook)
-    if (Math.abs(this.camera.fov - fov) > 0.01) {
+    if (cut && prev) {
+      // a small settle after each cut, so a change of angle is felt
+      this.camera.fov = fov * 1.1
+      this.camera.updateProjectionMatrix()
+    } else if (Math.abs(this.camera.fov - fov) > 0.01) {
       this.camera.fov = cut ? fov : this.camera.fov + (fov - this.camera.fov) * (1 - Math.exp(-5 * realDt))
       this.camera.updateProjectionMatrix()
     }

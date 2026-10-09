@@ -247,5 +247,10 @@
  "reel.second_half": "後半",
  "reel.fulltime": "試合終了",
  "reel.restart": "再開",
- "reel.next": "次のハイライト"
+ "reel.next": "次のハイライト",
+ "cam.celebrate": "祝勝カメラ",
+ "voice.on": "解説オン",
+ "voice.off": "解説オフ",
+ "home.crewLive": "AI解説",
+ "home.factChecked": "コードで事実確認済み"
 }

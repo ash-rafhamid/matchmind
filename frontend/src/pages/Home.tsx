@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
+import { CamCut, CameraSwitch, useCamCut } from '../components/Broadcast'
 import { formatClock, PlaybackClock, useClock } from '../lib/clock'
 import { scoreAt } from '../lib/match'
 import { useSettings, useT } from '../lib/settings'
 import { buildReel, ReelDirector, type ReelState } from '../lib/reel'
 import { TrackingStore } from '../lib/tracking'
-import { onPrimary } from '../lib/ui'
+import { momentTitle, onPrimary, stripTags } from '../lib/ui'
+import type { CameraMode } from '../scene/Stadium'
 import type { MatchPackage, MatchSummary } from '../types'
 
 const Miniature = lazy(() => import('../components/Miniature'))
@@ -66,6 +68,9 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
 
   const [reel, setReel] = useState<ReelState | null>(null)
   const [replayDir, setReplayDir] = useState<1 | -1 | null>(null)
+  // the AI director tours every angle; any camera can be picked
+  const [cam, setCam] = useState<CameraMode>('director')
+  const { cut, onCut, pick } = useCamCut(setCam)
 
   useEffect(() => {
     if (!clock || !pkg || !store) return
@@ -92,7 +97,7 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
     <section className="relative h-[calc(100vh-52px)] min-h-[560px] overflow-hidden bg-ink">
       {pkg && clock && store ? (
         <Suspense fallback={null}>
-          <Miniature pkg={pkg} store={store} clock={clock} mode="director" replay={replayDir} className="absolute inset-0" />
+          <Miniature pkg={pkg} store={store} clock={clock} mode={cam} tour={cam === 'director'} onCut={onCut} replay={replayDir} className="absolute inset-0" />
         </Suspense>
       ) : (
         <div className="absolute inset-0 grid place-items-center">
@@ -100,7 +105,14 @@ function Hero({ pkg }: { pkg: MatchPackage | null }) {
         </div>
       )}
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(11,12,14,0.78)_0%,rgba(11,12,14,0.35)_38%,transparent_62%),linear-gradient(0deg,rgba(11,12,14,0.55)_0%,transparent_35%)]" />
-      {pkg && clock && <OnAir pkg={pkg} clock={clock} replay={reel?.phase === 'replay'} />}
+      <CamCut cut={cut} />
+      {pkg && clock && (
+        <div className="absolute top-4 right-4 z-[7] flex flex-col items-end gap-2 sm:top-6 sm:right-6">
+          <OnAir pkg={pkg} clock={clock} replay={reel?.phase === 'replay'} />
+          <CameraSwitch mode={cam} onMode={pick} />
+        </div>
+      )}
+      {pkg && clock && <HeroCommentary pkg={pkg} clock={clock} reel={reel} />}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 pb-10 sm:px-10 sm:pb-14">
         <div className="pointer-events-auto max-w-[760px] text-white">
           <div className="flex items-stretch">
@@ -137,7 +149,7 @@ function OnAir({ pkg, clock, replay }: { pkg: MatchPackage; clock: PlaybackClock
   const { home, away } = pkg.meta.teams
   const t = useT()
   return (
-    <div className="absolute top-4 right-4 flex h-9 items-stretch shadow-[0_6px_24px_rgba(0,0,0,0.35)] sm:top-6 sm:right-6">
+    <div className="flex h-9 items-stretch shadow-[0_6px_24px_rgba(0,0,0,0.35)]">
       <span className="cut-l flex items-center gap-2 bg-flare pr-3 pl-4 cond text-white">
         <span className="live-pip !bg-white" /> {replay ? t('reel.replay') : t('home.onAir')}
       </span>
@@ -151,6 +163,43 @@ function OnAir({ pkg, clock, replay }: { pkg: MatchPackage; clock: PlaybackClock
         {away.short}
       </span>
       <span className="cut-r flex items-center bg-ink pr-4 pl-3 xp text-[13px] text-volt tab-num">{formatClock(time, pkg.meta.period_lengths_s['1'])}</span>
+    </div>
+  )
+}
+
+/** The crew's verified commentary on the highlight being shown - only once it has happened on screen. */
+function HeroCommentary({ pkg, clock, reel }: { pkg: MatchPackage; clock: PlaybackClock; reel: ReelState | null }) {
+  const { persona, lang, t } = useSettings()
+  const { time } = useClock(clock, 2)
+  const id = reel?.clip?.moment
+  const moment = id ? pkg.analytics.moments.find((m) => m.id === id) : undefined
+  const [story, setStory] = useState<{ id: string; text: string; ok: boolean } | null>(null)
+  useEffect(() => {
+    if (!id) return
+    let alive = true
+    api
+      .story(pkg.meta.id, id, persona, lang)
+      .then((s) => alive && setStory({ id, text: stripTags(s.text), ok: !!s.verdict?.passed }))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [pkg.meta.id, id, persona, lang])
+  const show = !!moment && story?.id === moment.id && (reel?.phase === 'replay' || (reel?.phase === 'clip' && time >= moment.ts + 1))
+  if (!show || !moment || !story) return null
+  return (
+    <div key={moment.id} className="wipe-up pointer-events-none absolute right-10 bottom-14 z-[7] hidden w-[440px] shadow-[0_10px_40px_rgba(0,0,0,0.35)] xl:block">
+      <div className="flex items-stretch">
+        <span className="cut-l flex items-center bg-volt ps-4 pe-3 cond text-ink">🎙 {t('home.crewLive')}</span>
+        <span className="flex items-center bg-ink px-3 xp text-[13px] text-volt tab-num">{moment.clock}</span>
+        <span className="plate cut-r flex min-w-0 flex-1 items-center pe-5 ps-3">
+          <span className="xp truncate text-[14px]">{momentTitle(moment, t)}</span>
+        </span>
+      </div>
+      <div className="plate px-4 py-3">
+        <p className="line-clamp-4 text-[14px] leading-snug">{story.text}</p>
+        {story.ok && <p className="mt-2 cond text-[11px] text-ink-3">✓ {t('home.factChecked')}</p>}
+      </div>
     </div>
   )
 }
