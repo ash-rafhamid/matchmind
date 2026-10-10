@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { api } from '../api'
 import { CamCut, CameraSwitch, useCamCut } from '../components/Broadcast'
 import { formatClock, PlaybackClock, useClock } from '../lib/clock'
@@ -272,6 +272,7 @@ function Rundown() {
 }
 
 /** Build a new synthetic match, written as a sentence. */
+/** Build your own match: two clubs, and the home coach's plan, laid out like a broadcast match-setup screen. */
 function ScenarioLab() {
   const { options, t } = useSettings()
   const teams = options ? Object.entries(options.teams) : []
@@ -298,6 +299,8 @@ function ScenarioLab() {
     }
   }
   const pressWord = t(`home.press.${press >= 0.8 ? 4 : press >= 0.6 ? 3 : press >= 0.4 ? 2 : 1}`)
+  const homeName = options?.teams[home]?.name ?? ''
+  const fill = (v: number, lo: number, hi: number) => ({ '--fill': `${((v - lo) / (hi - lo)) * 100}%` }) as CSSProperties
 
   return (
     <section className="mx-auto max-w-[1480px] px-4 py-14 sm:px-8">
@@ -308,68 +311,93 @@ function ScenarioLab() {
             <br />
             <span className="xp-light">{t('home.lab')}</span>
           </h2>
-          <p className="mt-4 max-w-[38ch] text-[15px] text-ink-3">
-            {t('home.scenarioNote')}
-          </p>
+          <p className="mt-4 max-w-[38ch] text-[15px] text-ink-3">{t('home.scenarioNote')}</p>
         </div>
-        <div className="plate p-6 sm:p-8">
-          <p className="text-[22px] leading-[1.9] font-medium sm:text-[28px]">
-            <select value={home} onChange={(e) => setHome(e.target.value)} className="pick" aria-label="Home team">
-              {teams.map(([id, t]) => (
-                <option key={id} value={id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>{' '}
-            {t('home.host')}{' '}
-            <select value={away} onChange={(e) => setAway(e.target.value)} className="pick" aria-label="Away team">
-              {teams.map(([id, t]) => (
-                <option key={id} value={id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            .{' '}
-            {switchOn ? (
-              <>
-                {t('home.atMinute')}{' '}
-                <input type="number" min={10} max={85} value={minute} onChange={(e) => setMinute(Math.max(10, Math.min(85, +e.target.value || 10)))} className="pick-num" aria-label="Minute of the switch" />
-                {t('home.coachGoes')}{' '}
-                <select value={formation} onChange={(e) => setFormation(e.target.value)} className="pick" aria-label="New formation">
-                  {(options?.formations ?? ['3-4-3']).map((f) => (
-                    <option key={f}>{f}</option>
-                  ))}
-                </select>{' '}
-                {t('home.andTell')} <span className="bg-volt px-1">{pressWord}</span>.
-              </>
-            ) : (
-              <>{t('home.stickToPlans')}</>
-            )}
-          </p>
-          <div className="mt-6 grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
-            {switchOn ? (
-              <label className="block">
-                <span className="cond text-ink-3">
-                  {t('home.pressing')} · <span className="text-ink tab-num">{press.toFixed(2)}</span>
-                </span>
-                <input type="range" min={0} max={1} step={0.05} value={press} onChange={(e) => setPress(+e.target.value)} />
-              </label>
-            ) : (
-              <span />
-            )}
-            <label className="flex items-center gap-2 text-[14px] text-ink-2">
-              <input type="checkbox" checked={switchOn} onChange={(e) => setSwitchOn(e.target.checked)} /> {t('home.tacticalSwitch')}
-            </label>
+        <div className="plate shadow-[0_10px_40px_rgba(11,12,14,0.08)]">
+          {/* the fixture */}
+          <div className="grid items-center gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:p-7">
+            <TeamPick label={t('lab.home')} id={home} onChange={setHome} teams={teams} />
+            <span className="text-center xp text-[20px] text-ink-4">{t('lab.vs')}</span>
+            <TeamPick label={t('lab.away')} id={away} onChange={setAway} teams={teams} right />
           </div>
-          <div className="mt-6 flex flex-wrap items-center gap-4">
+          {/* the home coach's plan */}
+          <div className="border-t border-line px-5 py-5 sm:px-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="cond text-ink-3">{t('lab.plan')}</span>
+              <button role="switch" aria-checked={switchOn} onClick={() => setSwitchOn(!switchOn)} className="flex items-center gap-2.5 cond text-[12px] text-ink-2">
+                <span className={`relative h-5 w-10 transition-colors ${switchOn ? 'bg-ink' : 'bg-concrete-2'}`}>
+                  <span className={`absolute top-0.5 h-4 w-4 transition-all ${switchOn ? 'left-[22px] bg-volt' : 'left-0.5 bg-white'}`} />
+                </span>
+                {t('home.tacticalSwitch')}
+              </button>
+            </div>
+            {switchOn && (
+              <div className="fade-in mt-5 grid gap-x-8 gap-y-6 md:grid-cols-2">
+                <label className="block">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="cond text-ink-3">{t('lab.minute')}</span>
+                    <span className="xp text-[26px] leading-none tab-num">{minute}'</span>
+                  </span>
+                  <input type="range" min={10} max={85} step={1} value={minute} onChange={(e) => setMinute(+e.target.value)} className="fill mt-2" style={fill(minute, 10, 85)} />
+                </label>
+                <label className="block">
+                  <span className="flex items-baseline justify-between gap-3">
+                    <span className="cond text-ink-3">{t('home.pressing')}</span>
+                    <span className="cut-both bg-volt px-2.5 py-0.5 cond text-[12px] text-ink">{pressWord}</span>
+                  </span>
+                  <input type="range" min={0} max={1} step={0.05} value={press} onChange={(e) => setPress(+e.target.value)} className="fill mt-2" style={fill(press, 0, 1)} />
+                </label>
+                <div className="md:col-span-2">
+                  <span className="cond text-ink-3">{t('lab.shape')}</span>
+                  <div className="seg mt-2 flex flex-wrap bg-concrete" role="group" aria-label={t('lab.shape')}>
+                    {(options?.formations ?? ['3-4-3']).map((f) => (
+                      <button key={f} aria-pressed={formation === f} onClick={() => setFormation(f)} className="tab-num !text-[13px]">
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* what will happen, and kick off */}
+          <div className="flex flex-wrap items-center gap-4 bg-ink px-5 py-4 sm:px-7">
+            <p className="min-w-[220px] flex-1 text-[15px] leading-snug text-white/85">
+              {switchOn ? t('lab.summary', { minute, team: homeName, formation, press: pressWord }) : t('home.stickToPlans')}
+            </p>
             <button onClick={create} disabled={busy || home === away} className="btn btn-volt !px-7 !py-3">
               {busy ? <span className="working">{t('home.simulating')}</span> : t('home.kickOff')}
             </button>
-            {home === away && <span className="text-[14px] text-flare">{t('home.sameClub')}</span>}
-            {error && <span className="text-[14px] text-flare">{error}</span>}
           </div>
+          {(home === away || error) && <p className="px-5 py-3 text-[14px] text-flare sm:px-7">{home === away ? t('home.sameClub') : error}</p>}
         </div>
       </div>
     </section>
+  )
+}
+
+type TeamOption = [string, { name: string; primary: string; formation: string; traits: string[] }]
+
+/** A club picker that looks like a broadcast caption: club colour, name, shape and style. */
+function TeamPick({ label, id, onChange, teams, right = false }: { label: string; id: string; onChange: (id: string) => void; teams: TeamOption[]; right?: boolean }) {
+  const team = teams.find(([k]) => k === id)?.[1]
+  return (
+    <label className={`relative flex min-w-0 items-stretch bg-concrete transition-colors focus-within:outline-2 focus-within:outline-flare hover:bg-concrete-2 ${right ? 'sm:flex-row-reverse sm:text-right' : ''}`}>
+      <span className="w-2.5 shrink-0" style={{ background: team?.primary ?? 'var(--color-ink-4)' }} />
+      <span className="min-w-0 flex-1 px-4 py-3">
+        <span className="block cond text-[11px] text-ink-3">{label}</span>
+        <span className="block truncate xp text-[20px] leading-tight sm:text-[24px]">
+          {team?.name ?? '…'} <span className="text-[13px] text-ink-4">▼</span>
+        </span>
+        <span className="block truncate text-[12px] text-ink-3">{team ? [team.formation, ...team.traits.slice(0, 2)].join(' · ') : ''}</span>
+      </span>
+      <select value={id} onChange={(e) => onChange(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={label}>
+        {teams.map(([k, tm]) => (
+          <option key={k} value={k}>
+            {tm.name}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }

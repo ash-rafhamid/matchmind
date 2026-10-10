@@ -54,10 +54,6 @@
  "home.scenario": "Cenário",
  "home.lab": "laboratório",
  "home.scenarioNote": "Configure um jogo sintético novo. Cada evento, tracking a 10 Hz e análise completa são simulados em cerca de dez segundos, depois vê no estádio com a equipa.",
- "home.host": "host",
- "home.atMinute": "Ao minuto",
- "home.coachGoes": ", o treinador da casa diz",
- "home.andTell": "e manda",
  "home.press.4": "pressionar como loucos",
  "home.press.3": "pressionar forte",
  "home.press.2": "pressionar um pouco",
@@ -254,5 +250,12 @@
  "home.crewLive": "Comentário AI",
  "home.factChecked": "Verificado por código",
  "cam.live": "Ao vivo",
- "cam.closeup": "Close-up"
+ "cam.closeup": "Close-up",
+ "lab.home": "Casa",
+ "lab.away": "Fora",
+ "lab.vs": "vs",
+ "lab.plan": "Plano do treinador da casa",
+ "lab.minute": "Minuto da mudança",
+ "lab.shape": "Nova formação",
+ "lab.summary": "Aos {minute}', {team} muda para {formation} e {press}."
 }

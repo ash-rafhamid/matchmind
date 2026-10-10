@@ -54,10 +54,6 @@
  "home.scenario": "Szenario",
  "home.lab": "Labor",
  "home.scenarioNote": "Ein komplett neues synthetisches Spiel aufsetzen. Jedes Ereignis, 10 Hz Tracking und volle Analyse werden in etwa zehn Sekunden simuliert, dann schaust du es im Stadion mit der Crew.",
- "home.host": "Host",
- "home.atMinute": "In Minute",
- "home.coachGoes": ", der Heimtrainer sagt",
- "home.andTell": "und sagt ihnen, sie sollen",
  "home.press.4": "wie verrückt pressen",
  "home.press.3": "hart pressen",
  "home.press.2": "ein bisschen pressen",
@@ -254,5 +250,12 @@
  "home.crewLive": "KI-Kommentar",
  "home.factChecked": "Vom Code geprüft",
  "cam.live": "Live",
- "cam.closeup": "Nahaufnahme"
+ "cam.closeup": "Nahaufnahme",
+ "lab.home": "Heim",
+ "lab.away": "Auswärts",
+ "lab.vs": "vs",
+ "lab.plan": "Plan des Heimtrainers",
+ "lab.minute": "Minute des Wechsels",
+ "lab.shape": "Neue Formation",
+ "lab.summary": "In der {minute}' wechselt {team} zu {formation} und {press}."
 }

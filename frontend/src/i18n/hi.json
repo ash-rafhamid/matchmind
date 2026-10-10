@@ -54,10 +54,6 @@
  "home.scenario": "परिदृश्य",
  "home.lab": "प्रयोगशाला",
  "home.scenarioNote": "एक नया सिंथेटिक मैच सेट करें। हर इवेंट, 10 Hz ट्रैकिंग और पूरी एनालिटिक्स लगभग दस सेकंड में सिम्युलेट होती है, फिर आप इसे स्टेडियम में क्रू के साथ देखते हैं।",
- "home.host": "होस्ट",
- "home.atMinute": "मिनट पर",
- "home.coachGoes": ", घरेलू कोच कहते हैं",
- "home.andTell": "और उन्हें कहते हैं",
  "home.press.4": "पागलों की तरह दबाव डालो",
  "home.press.3": "कड़ी प्रेसिंग करो",
  "home.press.2": "थोड़ा दबाव डालो",
@@ -254,5 +250,12 @@
  "home.crewLive": "AI कमेंट्री",
  "home.factChecked": "कोड से सत्यापित",
  "cam.live": "लाइव",
- "cam.closeup": "क्लोज़-अप"
+ "cam.closeup": "क्लोज़-अप",
+ "lab.home": "होम",
+ "lab.away": "अवे",
+ "lab.vs": "vs",
+ "lab.plan": "होम कोच की योजना",
+ "lab.minute": "बदलाव का मिनट",
+ "lab.shape": "नई व्यवस्था",
+ "lab.summary": "{minute}' पर, {team} ने {formation} में बदलाव किया और {press}।"
 }

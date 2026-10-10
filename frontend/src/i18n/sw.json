@@ -54,10 +54,6 @@
  "home.scenario": "Hali",
  "home.lab": "maabara",
  "home.scenarioNote": "Tengeneza mechi mpya ya bandia. Kila tukio, ufuatiliaji wa 10 Hz na uchambuzi kamili husimulizwa kwa takriban sekunde kumi, kisha utaiona uwanjani na kikosi.",
- "home.host": "mwendeshaji",
- "home.atMinute": "Dakika ya",
- "home.coachGoes": ", kocha wa nyumbani anasema",
- "home.andTell": "na kuwaambia wa",
  "home.press.4": "shinikiza kama wazimu",
  "home.press.3": "shinikiza kwa nguvu",
  "home.press.2": "shinikiza kidogo",
@@ -254,5 +250,12 @@
  "home.crewLive": "Maoni ya AI",
  "home.factChecked": "Imethibitishwa na msimbo",
  "cam.live": "Moja kwa moja",
- "cam.closeup": "Picha ya karibu"
+ "cam.closeup": "Picha ya karibu",
+ "lab.home": "Nyumbani",
+ "lab.away": "Ugenini",
+ "lab.vs": "dhidi ya",
+ "lab.plan": "Mpango wa kocha wa nyumbani",
+ "lab.minute": "Dakika ya mabadiliko",
+ "lab.shape": "Mpangilio mpya",
+ "lab.summary": "Dakika {minute}', {team} walibadilisha hadi {formation} na {press}."
 }

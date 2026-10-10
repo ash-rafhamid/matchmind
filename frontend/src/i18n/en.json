@@ -54,10 +54,6 @@
  "home.scenario": "Scenario",
  "home.lab": "lab",
  "home.scenarioNote": "Set up a brand-new synthetic match. Every event, 10 Hz tracking and full analytics are simulated in about ten seconds, then you watch it in the stadium with the crew.",
- "home.host": "host",
- "home.atMinute": "At minute",
- "home.coachGoes": ", the home coach goes",
- "home.andTell": "and tells them to",
  "home.press.4": "press like maniacs",
  "home.press.3": "press hard",
  "home.press.2": "press a little",
@@ -254,5 +250,12 @@
  "home.crewLive": "AI commentary",
  "home.factChecked": "Fact-checked by code",
  "cam.live": "Live",
- "cam.closeup": "Close-up"
+ "cam.closeup": "Close-up",
+ "lab.home": "Home",
+ "lab.away": "Away",
+ "lab.vs": "vs",
+ "lab.plan": "The home coach's plan",
+ "lab.minute": "Minute of the switch",
+ "lab.shape": "New formation",
+ "lab.summary": "At {minute}', {team} switch to {formation} and {press}."
 }

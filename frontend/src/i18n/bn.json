@@ -54,10 +54,6 @@
  "home.scenario": "পরিস্থিতি",
  "home.lab": "ল্যাব",
  "home.scenarioNote": "একটি নতুন কৃত্রিম ম্যাচ সেট আপ করুন। প্রতিটি ইভেন্ট, ১০ Hz ট্র্যাকিং এবং পূর্ণ বিশ্লেষণ প্রায় দশ সেকেন্ডে সিমুলেট হয়, তারপর আপনি ক্রুর সাথে স্টেডিয়ামে দেখেন।",
- "home.host": "হোস্ট",
- "home.atMinute": "মিনিটে",
- "home.coachGoes": ", হোম কোচ বলে",
- "home.andTell": "এবং বলে",
  "home.press.4": "পাগলের মতো প্রেস করো",
  "home.press.3": "কঠোর প্রেস করো",
  "home.press.2": "আধটু প্রেস করো",
@@ -254,5 +250,12 @@
  "home.crewLive": "এআই কমেন্টারি",
  "home.factChecked": "কোড দ্বারা যাচাই",
  "cam.live": "লাইভ",
- "cam.closeup": "ক্লোজ-আপ"
+ "cam.closeup": "ক্লোজ-আপ",
+ "lab.home": "হোম",
+ "lab.away": "আউট",
+ "lab.vs": "বিরুদ্ধে",
+ "lab.plan": "হোম কোচের পরিকল্পনা",
+ "lab.minute": "পরিবর্তনের মিনিট",
+ "lab.shape": "নতুন ফর্মেশন",
+ "lab.summary": "{minute}' এ, {team} {formation} এ পরিবর্তন করে এবং {press}।"
 }

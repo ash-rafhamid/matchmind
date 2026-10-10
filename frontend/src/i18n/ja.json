@@ -54,10 +54,6 @@
  "home.scenario": "シナリオ",
  "home.lab": "ラボ",
  "home.scenarioNote": "新しい合成試合をセットアップ。すべてのイベント、10 Hzトラッキング、完全解析を約10秒でシミュレートし、スタジアムでクルーと観戦。",
- "home.host": "ホスト",
- "home.atMinute": "分に",
- "home.coachGoes": "、ホームコーチが動く",
- "home.andTell": "そして指示する",
  "home.press.4": "狂ったようにプレス",
  "home.press.3": "激しくプレス",
  "home.press.2": "少しプレス",
@@ -254,5 +250,12 @@
  "home.crewLive": "AI解説",
  "home.factChecked": "コードで事実確認済み",
  "cam.live": "ライブ",
- "cam.closeup": "クローズアップ"
+ "cam.closeup": "クローズアップ",
+ "lab.home": "ホーム",
+ "lab.away": "アウェイ",
+ "lab.vs": "対",
+ "lab.plan": "ホーム監督のプラン",
+ "lab.minute": "交代の分",
+ "lab.shape": "新フォーメーション",
+ "lab.summary": "{minute}分、{team}は{formation}に切り替え、{press}を実施。"
 }

@@ -391,6 +391,16 @@
     background: var(--color-volt-2);
   }
 
+  /* sliders that show how far along they are */
+  input[type="range"].fill::-webkit-slider-runnable-track {
+    background: linear-gradient(90deg, var(--color-ink) var(--fill, 0%), var(--color-concrete-2) var(--fill, 0%));
+  }
+
+  input[type="range"].fill::-moz-range-progress {
+    height: 4px;
+    background: var(--color-ink);
+  }
+
   input[type="checkbox"] {
     accent-color: var(--color-ink);
   }
