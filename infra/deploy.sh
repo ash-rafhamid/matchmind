@@ -4,8 +4,8 @@
 #   Microsoft Foundry (AI Services) + gpt-4.1-mini (Global Standard)
 #   Azure Container Registry (image built locally - ACR Tasks are not available on student subscriptions)
 #   Azure Container Apps, WorkloadProfiles environment (Express environments do not support managed identity)
-#   System-assigned managed identity: AcrPull for the image, "Cognitive Services OpenAI User" for the model -
-#   no registry passwords and no model keys anywhere
+#   System-assigned managed identity: AcrPull for the image, "Cognitive Services OpenAI User" for the model and
+#   "Cognitive Services Speech User" for the commentator's voice - no registry passwords and no keys anywhere
 #
 # Usage:  LOCATION=japaneast bash infra/deploy.sh        (run from the repo root, Docker running, az logged in)
 set -euo pipefail
@@ -41,6 +41,7 @@ $AZ cognitiveservices account deployment create -n "$FOUNDRY" -g "$RG" --deploym
   --model-name "$MODEL" --model-version "$MODEL_VERSION" --model-format OpenAI \
   --sku-name GlobalStandard --sku-capacity "$CAPACITY" -o none
 ENDPOINT=$($AZ cognitiveservices account show -n "$FOUNDRY" -g "$RG" --query properties.endpoint -o tsv)
+SCOPE=$($AZ cognitiveservices account show -n "$FOUNDRY" -g "$RG" --query id -o tsv)
 
 echo "==> registry $ACR + image $TAG (local Docker build)"
 $AZ acr show -n "$ACR" -o none 2>/dev/null || $AZ acr create -n "$ACR" -g "$RG" -l "$LOCATION" --sku Basic -o none
@@ -51,7 +52,8 @@ docker push "$SERVER/matchmind:$TAG"
 
 echo "==> container app $APP"
 ENV_VARS=(LLM_PROVIDER=azure_openai AZURE_OPENAI_ENDPOINT="$ENDPOINT" AZURE_OPENAI_DEPLOYMENT="$MODEL"
-          AZURE_OPENAI_API_VERSION=2024-10-21 AI_REQUESTS_PER_10_MIN=40)
+          AZURE_OPENAI_API_VERSION=2024-10-21 AI_REQUESTS_PER_10_MIN=40
+          AZURE_SPEECH_RESOURCE_ID="$SCOPE" AZURE_SPEECH_REGION="$LOCATION")
 if $AZ containerapp show -n "$APP" -g "$RG" -o none 2>/dev/null; then
   $AZ containerapp update -n "$APP" -g "$RG" --image "$SERVER/matchmind:$TAG" --set-env-vars "${ENV_VARS[@]}" -o none
 else
@@ -63,11 +65,12 @@ else
     --min-replicas 1 --max-replicas 2 --env-vars "${ENV_VARS[@]}" -o none
 fi
 
-echo "==> managed identity -> Foundry (keyless)"
+echo "==> managed identity -> Foundry model and Speech (keyless)"
 PRINCIPAL=$($AZ containerapp show -n "$APP" -g "$RG" --query identity.principalId -o tsv)
-SCOPE=$($AZ cognitiveservices account show -n "$FOUNDRY" -g "$RG" --query id -o tsv)
-$AZ role assignment create --assignee-object-id "$PRINCIPAL" --assignee-principal-type ServicePrincipal \
-  --role "Cognitive Services OpenAI User" --scope "$SCOPE" -o none 2>/dev/null || true
+for ROLE in "Cognitive Services OpenAI User" "Cognitive Services Speech User"; do
+  $AZ role assignment create --assignee-object-id "$PRINCIPAL" --assignee-principal-type ServicePrincipal \
+    --role "$ROLE" --scope "$SCOPE" -o none 2>/dev/null || true
+done
 
 URL=$($AZ containerapp show -n "$APP" -g "$RG" --query properties.configuration.ingress.fqdn -o tsv)
 echo
