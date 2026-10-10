@@ -21,13 +21,31 @@ CLUB = re.compile(r"\b(?:[A-Z][a-z]+ ){1,2}(?:City|Town|United|Rovers|Athletic|A
 ALWAYS_OK = {0.0, 1.0, 2.0, 3.0, 10.0, 11.0, 45.0, 90.0, 100.0}  # one-two, 3 points, "4 in 10", 11 v 11, halves
 
 MULTI_TAG = re.compile(r"\[\s*#?(\d+)(?:\s*(?:[,;\-\u2013]|to|and|&)\s*#?\d+)+\s*\]")
+BAD_ID_TAG = re.compile(r"\s*\[#(?!\d+\])[^\]\n]{0,40}\]")
 LOOSE_TAG = re.compile(r"\[(?!#\d)[^\]\n]{1,40}\]")
+
+
+UNKNOWN_TAG = re.compile(r"evidence tag \[#(\d+)\] is not part of the supplied facts")
+
+
+def drop_unsupported_tags(text: str, issues: list[str]) -> tuple[str, list[str]]:
+    """Remove replay links (evidence tags) that the facts do not back; every claim is still checked.
+
+    Returns the cleaned text and the issues that remain once those links are gone.
+    """
+    bad = {m.group(1) for i in issues if (m := UNKNOWN_TAG.match(i))}
+    if not bad:
+        return text, issues
+    for b in bad:
+        text = re.sub(rf"\s*\[#{b}\]", "", text)
+    return text.strip(), [i for i in issues if not UNKNOWN_TAG.match(i)]
 
 
 def normalize_tags(text: str) -> str:
     """Model output clean-up: "[#40, #45]" / "[#40-#45]" -> "[#40] [#45]", and drop bracket tags that are not event ids."""
     text = MULTI_TAG.sub(lambda m: " ".join(f"[#{i}]" for i in re.findall(r"\d+", m.group(0))), text)
     text = LOOSE_TAG.sub("", text)
+    text = BAD_ID_TAG.sub("", text)  # "[#90+2]", "[#goal]": a minute or word dressed up as an event id
     return re.sub(r"[ \t]{2,}", " ", text).replace(" .", ".").replace(" ,", ",").strip()
 
 

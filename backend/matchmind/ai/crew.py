@@ -41,7 +41,7 @@ from agent_framework import (
 from .. import tools as match_tools
 from .personas import persona_brief
 from .templates import narrate_moment, narrate_whatif, recap as template_recap
-from .verifier import SCORELINE, normalize_tags, verify
+from .verifier import SCORELINE, drop_unsupported_tags, normalize_tags, verify
 
 MAX_DRAFTS = 2
 
@@ -244,6 +244,13 @@ class FactChecker(Executor):
                             "checked_numbers": 0, "checked_names": 0, "evidence": []}
         else:
             verdict_dict = verify(text, job.packet, job.roster, job.allowed_ids).to_dict()
+            if not verdict_dict["passed"]:
+                cleaned, remaining = drop_unsupported_tags(draft.text, verdict_dict["issues"])
+                if not remaining and cleaned != draft.text:
+                    draft = Draft(cleaned, job, draft.notes, draft.attempt)
+                    data = _parse_recap(draft.text) if job.kind == "recap" else None
+                    text = _recap_text(data) if data else draft.text
+                    verdict_dict = verify(text, job.packet, job.roster, job.allowed_ids).to_dict()
             if job.kind == "recap" and verdict_dict["passed"] and not _states_final_score(data["article"], job.packet):
                 verdict_dict["passed"] = False
                 verdict_dict["issues"].append("the article does not state the final score: " + _final_score_text(job.packet))
@@ -398,6 +405,14 @@ class Crew:
             facts["tool_results"] = [e["result"] for e in evidence]
             verdict = verify(answer, facts, roster, _ids_in(facts))
             trace.append({"agent": "Host", "kind": "llm", "output": answer, "attempt": 2, "ms": 0})
+        if not verdict.passed:
+            # replay links the tools never returned are dropped; the answer itself must still pass every check
+            cleaned, remaining = drop_unsupported_tags(answer, verdict.issues)
+            if not remaining and cleaned != answer:
+                answer = cleaned
+                verdict = verify(answer, facts, roster, _ids_in(facts))
+                trace.append({"agent": "Fact-checker", "kind": "code", "passed": verdict.passed,
+                              "output": "removed replay links the facts do not back", "ms": 0})
         trace.append({"agent": "Fact-checker", "kind": "code", "passed": verdict.passed,
                       "output": "passed" if verdict.passed else "; ".join(verdict.issues), "ms": 0})
         return {"answer": answer, "verdict": verdict.to_dict(), "trace": trace, "mode": "ai"}
