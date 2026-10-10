@@ -25,12 +25,14 @@ export function onPrimary(team: { primary: string; secondary: string }): string 
 
 export const ROMAN = ['i', 'ii', 'iii', 'iv', 'v', 'vi']
 
-/** Surname for compact labels ("Jonah Lindqvist" -> "Lindqvist"). */
-/** Evidence tags as the model sometimes writes them - "[#40, #45]", "[#391-#398]" - split into one tag per event. */
+/**
+ * Evidence tags as the model sometimes writes them - "[#40, #45]", "[#391-#398]" - split into one tag per event;
+ * tags that are not event ids at all ("[#90+2]" is a minute) are dropped.
+ */
 export function tidyTags(text: string): string {
-  return text.replace(/\[\s*#?\d+(?:\s*(?:[,;\-\u2013]|to|and|&)\s*#?\d+)+\s*\]/g, (m) =>
-    (m.match(/\d+/g) ?? []).map((n) => `[#${n}]`).join(' '),
-  )
+  return text
+    .replace(/\[\s*#?\d+(?:\s*(?:[,;\-\u2013]|to|and|&)\s*#?\d+)+\s*\]/g, (m) => (m.match(/\d+/g) ?? []).map((n) => `[#${n}]`).join(' '))
+    .replace(/\s*\[#(?!\d+\])[^\]\n]{0,40}\]/g, '')
 }
 
 /** The text without any evidence tags, for copying and reading aloud. */
@@ -38,6 +40,7 @@ export function stripTags(text: string): string {
   return tidyTags(text).replace(/\s*\[#\d+\]/g, '').replace(/\s+/g, ' ').trim()
 }
 
+/** Surname for compact labels ("Jonah Lindqvist" -> "Lindqvist"). */
 export const surname = (full: string) => full.split(' ').slice(-1)[0] ?? full
 
 type T = (key: string, vars?: Record<string, string | number>) => string
