@@ -54,10 +54,6 @@
  "home.scenario": "Scénario",
  "home.lab": "lab",
  "home.scenarioNote": "Lance un tout nouveau match synthétique. Chaque événement, suivi 10 Hz et analyses complètes sont simulés en environ dix secondes, puis tu le regardes au stade avec l’équipe.",
- "home.host": "hôte",
- "home.atMinute": "À la minute",
- "home.coachGoes": ", l’entraîneur à domicile dit",
- "home.andTell": "et lui demande de",
  "home.press.4": "presser comme des fous",
  "home.press.3": "presser fort",
  "home.press.2": "presser un peu",
@@ -254,5 +250,12 @@
  "home.crewLive": "Commentaire IA",
  "home.factChecked": "Vérifié par code",
  "cam.live": "Direct",
- "cam.closeup": "Gros plan"
+ "cam.closeup": "Gros plan",
+ "lab.home": "Domicile",
+ "lab.away": "Extérieur",
+ "lab.vs": "vs",
+ "lab.plan": "Le plan du coach à domicile",
+ "lab.minute": "Minute du changement",
+ "lab.shape": "Nouvelle formation",
+ "lab.summary": "À la {minute}', {team} passe en {formation} et {press}."
 }

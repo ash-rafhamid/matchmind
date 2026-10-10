@@ -65,12 +65,20 @@ def detect_moments(events: list[dict], meta: dict) -> list[dict]:
                 "build_up": chain,
             }
             if e["outcome"] == "goal":
-                score = _score_after(events, e["ts"] + 0.01)
+                # the goal event itself (a moment after the shot, when the ball crosses the line) carries the score
+                goal = next((g for g in events if g["type"] == "goal" and g["team"] == e["team"] and e["ts"] - 0.01 <= g["ts"] <= e["ts"] + 6), None)
+                score = dict(goal["score"]) if goal else _score_after(events, e["ts"] + 6)
                 before = dict(score)
                 before[e["team"]] -= 1
+                other = "away" if e["team"] == "home" else "home"
+                facts["score_before"] = before
                 facts["score_after"] = score
                 facts["state_before"] = _game_state(before, e["team"])
                 facts["state_after"] = _game_state(score, e["team"])
+                effect = {("trailing", "level"): "equaliser", ("level", "leading"): "puts them ahead",
+                          ("trailing", "trailing"): "pulls one back", ("leading", "leading"): "extends the lead"}
+                facts["what_the_goal_did"] = (f"{effect.get((facts['state_before'], facts['state_after']), 'goal')}: "
+                                              f"{team_name[e['team']]} {score[e['team']]}-{score[other]} {team_name[other]}")
                 imp = 1.0 if facts["state_before"] != "leading" else 0.85
                 if e["minute"] >= 80:
                     imp += 0.1

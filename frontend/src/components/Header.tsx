@@ -44,15 +44,15 @@ export default function Header() {
           <button
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
-            className="cut-both flex items-center gap-2 bg-white/10 py-1.5 ps-4 pe-4 text-[13px] hover:bg-white/20"
+            className="cut-both flex items-center gap-2 whitespace-nowrap bg-white/10 py-1.5 ps-4 pe-4 text-[13px] hover:bg-white/20"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
               <circle cx="12" cy="12" r="9" />
               <path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18" />
             </svg>
             <span className="font-semibold">{NATIVE[lang] ?? lang}</span>
-            <span className="text-white/50">·</span>
-            <span className="text-white/80">{t(`persona.${persona}`)}</span>
+            <span className="hidden text-white/50 sm:inline">·</span>
+            <span className="hidden text-white/80 sm:inline">{t(`persona.${persona}`)}</span>
             <span className="text-volt">▾</span>
           </button>
           {open && (

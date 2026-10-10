@@ -54,10 +54,6 @@
  "home.scenario": "السيناريو",
  "home.lab": "المختبر",
  "home.scenarioNote": "أنشئ مباراة صناعية جديدة كلياً. كل حدث، تتبع 10 هرتز وتحليلات كاملة تُحاكى خلال حوالي عشر ثوانٍ، ثم تشاهدها في الملعب مع الطاقم.",
- "home.host": "المضيف",
- "home.atMinute": "في الدقيقة",
- "home.coachGoes": "، مدرب الفريق المضيف يذهب",
- "home.andTell": "ويخبرهم أن",
  "home.press.4": "يضغطون بجنون",
  "home.press.3": "يضغطون بقوة",
  "home.press.2": "يضغطون قليلاً",
@@ -254,5 +250,12 @@
  "home.crewLive": "تعليق AI مباشر",
  "home.factChecked": "تم التحقق من الحقائق بواسطة الكود",
  "cam.live": "مباشر",
- "cam.closeup": "لقطة مقربة"
+ "cam.closeup": "لقطة مقربة",
+ "lab.home": "الأرض",
+ "lab.away": "الضيف",
+ "lab.vs": "ضد",
+ "lab.plan": "خطة مدرب الفريق المضيف",
+ "lab.minute": "دقيقة التبديل",
+ "lab.shape": "التشكيلة الجديدة",
+ "lab.summary": "في الدقيقة {minute}، {team} انتقل إلى {formation} و{press}."
 }

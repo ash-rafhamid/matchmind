@@ -54,10 +54,6 @@
  "home.scenario": "Escenario",
  "home.lab": "laboratorio",
  "home.scenarioNote": "Configura un partido sintético nuevo. Cada evento, seguimiento 10 Hz y análisis completo se simulan en unos diez segundos, luego lo ves en el estadio con la tripulación.",
- "home.host": "anfitrión",
- "home.atMinute": "En el minuto",
- "home.coachGoes": ", el entrenador local dice",
- "home.andTell": "y les dice que",
  "home.press.4": "presionen como locos",
  "home.press.3": "presionen fuerte",
  "home.press.2": "presionen un poco",
@@ -254,5 +250,12 @@
  "home.crewLive": "Comentario AI",
  "home.factChecked": "Verificado por código",
  "cam.live": "En vivo",
- "cam.closeup": "Primer plano"
+ "cam.closeup": "Primer plano",
+ "lab.home": "Local",
+ "lab.away": "Visitante",
+ "lab.vs": "vs",
+ "lab.plan": "El plan del entrenador local",
+ "lab.minute": "Minuto del cambio",
+ "lab.shape": "Nueva formación",
+ "lab.summary": "En el {minute}', {team} pasa a {formation} y {press}."
 }
