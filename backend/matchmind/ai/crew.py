@@ -41,7 +41,7 @@ from agent_framework import (
 from .. import tools as match_tools
 from .personas import persona_brief
 from .templates import narrate_moment, narrate_whatif, recap as template_recap
-from .verifier import normalize_tags, verify
+from .verifier import SCORELINE, normalize_tags, verify
 
 MAX_DRAFTS = 2
 
@@ -196,7 +196,8 @@ class Storyteller(Executor):
     def _task(self, job: Job) -> str:
         if job.kind == "recap":
             return ("Write the full-time package as JSON with keys: \"headline\" (max 12 words), \"article\" "
-                    "(120-180 words, with evidence tags), \"social\" (list of 3 short posts, max 200 characters each).")
+                    "(120-180 words, with evidence tags), \"social\" (list of 3 short posts, max 200 characters each). "
+                    "The first sentence of the article must give the final score with both club names, as digits.")
         if job.kind == "whatif":
             return ("Explain this what-if simulation to the audience: what was changed and when, how the win chance, expected points and xG for/against moved, and whether the effect is clear according to the verdict and 95% interval. Do not overstate a result marked 'no clear effect'.")
         return "Write the commentary for this moment."
@@ -243,6 +244,9 @@ class FactChecker(Executor):
                             "checked_numbers": 0, "checked_names": 0, "evidence": []}
         else:
             verdict_dict = verify(text, job.packet, job.roster, job.allowed_ids).to_dict()
+            if job.kind == "recap" and verdict_dict["passed"] and not _states_final_score(data["article"], job.packet):
+                verdict_dict["passed"] = False
+                verdict_dict["issues"].append("the article does not state the final score: " + _final_score_text(job.packet))
         job.trace.append({"agent": "Fact-checker", "kind": "code", "attempt": draft.attempt,
                           "output": "passed" if verdict_dict["passed"] else "; ".join(verdict_dict["issues"]),
                           "passed": verdict_dict["passed"], "ms": 0})
@@ -256,6 +260,22 @@ class FactChecker(Executor):
             job.trace.append({"agent": "Fact-checker", "kind": "code", "output": "AI draft rejected twice - "
                               "using the verified template narration instead", "passed": True, "ms": 0})
             await ctx.yield_output(fallback)
+
+
+def _final_score_text(packet: dict) -> str:
+    (a, x), (b, y) = list(packet.get("final_score", {}).items())[:2]
+    return f"{a} {x}-{y} {b}"
+
+
+def _states_final_score(article: str, packet: dict) -> bool:
+    """A match report has to say how it ended: the final scoreline, in either order."""
+    fs = list(packet.get("final_score", {}).values())
+    if len(fs) != 2:
+        return True
+    a, b = fs
+    found = {(int(m.group(1)), int(m.group(2))) for m in SCORELINE.finditer(article)}
+    words = re.search(rf"{a}.{{0,60}}{b}|{b}.{{0,60}}{a}", article) if a != b else None
+    return (a, b) in found or (b, a) in found or bool(words and not found)
 
 
 def _template(job: Job) -> CrewResult:
