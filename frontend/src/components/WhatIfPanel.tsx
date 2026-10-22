@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { useClock } from '../lib/clock'
 import { useMatch } from '../lib/match'
@@ -31,25 +31,40 @@ export default function WhatIfPanel() {
   }, [pkg.events, team.dna, minute, side])
 
   const [changes, setChanges] = useState<Record<string, number | string>>({})
-  const [runs, setRuns] = useState(200)
+  const [runs, setRuns] = useState(100)
   const [busy, setBusy] = useState(false)
+  const [explaining, setExplaining] = useState(false)
   const [res, setRes] = useState<{ result: WhatIfResult; explanation?: CrewResult } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const runId = useRef(0)
 
   const value = (k: string) => (k in changes ? changes[k] : baseline[k])
   const changed = Object.keys(changes).filter((k) => changes[k] !== baseline[k])
 
+  // numbers first, then the Tactician's reading (the server keeps the simulation, so the second call only waits for the crew)
   const run = async () => {
+    const id = ++runId.current
     setBusy(true)
+    setExplaining(false)
     setError(null)
     setRes(null)
     try {
       const payload = Object.fromEntries(changed.map((k) => [k, changes[k]]))
-      setRes(await api.whatif(pkg.meta.id, { team: side, from_minute: minute, changes: payload, runs, persona, lang }))
-    } catch (e) {
-      setError(String((e as Error).message ?? e))
-    } finally {
+      const body = { team: side, from_minute: minute, changes: payload, runs, persona, lang }
+      const numbers = await api.whatif(pkg.meta.id, { ...body, explain: false })
+      if (id !== runId.current) return
+      setRes(numbers)
       setBusy(false)
+      setExplaining(true)
+      const full = await api.whatif(pkg.meta.id, body)
+      if (id === runId.current) setRes({ result: numbers.result, explanation: full.explanation })
+    } catch (e) {
+      if (id === runId.current) setError(String((e as Error).message ?? e))
+    } finally {
+      if (id === runId.current) {
+        setBusy(false)
+        setExplaining(false)
+      }
     }
   }
 
@@ -128,12 +143,12 @@ export default function WhatIfPanel() {
       </div>
       {changed.length === 0 && <p className="mt-2 text-[13px] text-ink-3">{t('whatif.start')}</p>}
       {error && <p className="mt-3 text-[13px] text-flare">{error}</p>}
-      {res && <Result res={res.result} explanation={res.explanation} />}
+      {res && <Result res={res.result} explanation={res.explanation} explaining={explaining} />}
     </div>
   )
 }
 
-function Result({ res, explanation }: { res: WhatIfResult; explanation?: CrewResult }) {
+function Result({ res, explanation, explaining = false }: { res: WhatIfResult; explanation?: CrewResult; explaining?: boolean }) {
   const { pkg } = useMatch()
   const t = useT()
   const team = pkg.meta.teams[res.side]
@@ -181,6 +196,12 @@ function Result({ res, explanation }: { res: WhatIfResult; explanation?: CrewRes
       <p className="mt-2 text-[11px] text-ink-3">
         {t('whatif.changeEP')} {sign(res.expected_points_delta)} · {t('whatif.interval')} {lo} {t('whatif.to')} {hi}
       </p>
+      {explaining && !explanation && (
+        <div className="mt-5 border-t border-line pt-4">
+          <div className="cond text-ink-3">{t('whatif.reading')}</div>
+          <p className="working mt-2 text-[14px] text-ink-3">{t('match.crewWriting')}</p>
+        </div>
+      )}
       {explanation && (
         <div className="mt-5 border-t border-line pt-4">
           <div className="cond text-ink-3">{t('whatif.reading')}</div>
