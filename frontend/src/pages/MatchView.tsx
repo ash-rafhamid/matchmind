@@ -143,11 +143,18 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
     return () => director.stop()
   }, [director])
 
+  // every button that starts playback is a click, so it is the moment to wake the crowd and the commentator
+  const wakeAudio = () => {
+    if (sound) startAudio()
+    comm.unlock()
+  }
+
   const setMode = (m: PlayMode) => {
     setModeState(m)
     if (m === 'full') {
       director.stop()
     } else {
+      wakeAudio()
       clock.pause()
       director.start()
     }
@@ -167,8 +174,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
   }, [mode, clock, store, breaks, flash])
 
   const onPlay = () => {
-    if (sound) startAudio()
-    comm.unlock()
+    wakeAudio()
     if (mode === 'highlights') {
       if (reel.phase === 'off' || reel.phase === 'done') director.start()
       else if (clock.playing) clock.pause()
@@ -242,6 +248,7 @@ function LoadedMatch({ pkg }: { pkg: MatchPackage }) {
                 reel={reel}
                 onFull={() => setMode('full')}
                 onAgain={() => {
+                  wakeAudio()
                   clock.seek(0)
                   director.start()
                 }}

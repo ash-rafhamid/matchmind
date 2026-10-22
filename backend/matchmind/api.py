@@ -364,15 +364,27 @@ class WhatIfBody(BaseModel):
     explain: bool = True
 
 
+# Simulation results by input: the page asks for the numbers first and the explanation second, and the
+# second request must not wait for the same (deterministic) simulation again.
+_WHATIF_RESULTS: dict[str, dict] = {}
+
+
 @app.post("/api/matches/{match_id}/whatif")
 async def whatif(match_id: str, body: WhatIfBody, request: Request) -> dict:
     _check_audience(body.persona, body.lang)
     pkg = _load(match_id)
-    try:
-        result = await run_in_threadpool(run_what_if, pkg["meta"], body.team, body.from_minute, body.changes,
-                                         body.runs)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from None
+    sim_key = _key("whatif-sim", match_id, _version(match_id), body.team, body.from_minute,
+                   json.dumps(body.changes, sort_keys=True), body.runs)
+    result = _WHATIF_RESULTS.get(sim_key)
+    if result is None:
+        try:
+            result = await run_in_threadpool(run_what_if, pkg["meta"], body.team, body.from_minute, body.changes,
+                                             body.runs)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from None
+        _WHATIF_RESULTS[sim_key] = result
+        if len(_WHATIF_RESULTS) > 256:
+            _WHATIF_RESULTS.pop(next(iter(_WHATIF_RESULTS)))
     out: dict = {"result": result}
     if body.explain:
         key = _key("whatif", match_id, _version(match_id), json.dumps(body.model_dump(), sort_keys=True))

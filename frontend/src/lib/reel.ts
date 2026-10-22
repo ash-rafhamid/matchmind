@@ -170,6 +170,8 @@ export class ReelDirector {
       return
     }
     this.expected = t
+    // a speed the viewer picked on the transport carries over to the next clips (the replay's own 0.5 does not)
+    if (this.phase === 'clip' || (this.phase === 'replay' && this.clock.speed !== 0.5)) this.speed = this.clock.speed
     const c = this.clips[this.idx]
     if (this.phase === 'clip' && t >= c.end - 0.05) {
       if (c.goal) {

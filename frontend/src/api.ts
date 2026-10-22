@@ -48,7 +48,7 @@ export const api = {
     call<CrewResult>(`/api/matches/${id}/recap?persona=${persona}&lang=${lang}`),
   ask: (id: string, question: string, persona: string, lang: string) =>
     call<AskResult>(`/api/matches/${id}/ask`, { method: 'POST', body: JSON.stringify({ question, persona, lang }) }),
-  whatif: (id: string, body: { team: string; from_minute: number; changes: Record<string, number | string>; runs: number; persona: string; lang: string }) =>
+  whatif: (id: string, body: { team: string; from_minute: number; changes: Record<string, number | string>; runs: number; persona: string; lang: string; explain?: boolean }) =>
     call<{ result: WhatIfResult; explanation?: CrewResult }>(`/api/matches/${id}/whatif`, {
       method: 'POST',
       body: JSON.stringify(body),
