@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useT } from '../lib/settings'
 import type { TraceStep, Verdict } from '../types'
 
@@ -29,7 +30,8 @@ export function TraceButton({ trace, title }: { trace: TraceStep[]; title: strin
       <button onClick={() => setOpen(true)} className="act">
         {t('trace.button')} ({trace.length})
       </button>
-      {open && <TraceSheet trace={trace} title={title} onClose={() => setOpen(false)} />}
+      {/* portal: the story cards' entrance animation leaves a transform that would trap a fixed overlay inside the card */}
+      {open && createPortal(<TraceSheet trace={trace} title={title} onClose={() => setOpen(false)} />, document.body)}
     </>
   )
 }
