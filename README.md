@@ -3,6 +3,7 @@
 **Inside the Game: Developer Hackathon (Microsoft x Premier League) entry - "The Synthetic Match Insights Engine for Premier League Studio".**
 
 Live demo: **https://matchmind.blackisland-4799a434.japaneast.azurecontainerapps.io/**
+Demo video (1:55): **https://youtu.be/aOTA-lcrBrU**
 
 MatchMind turns a stream of synthetic, football-realistic match data into a **broadcast you can trust**:
 a 3D miniature stadium where every match plays out, a live commentator who calls the action in a neural voice,

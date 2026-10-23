@@ -1,6 +1,6 @@
 # MatchMind - submission text
 
-Copy-paste ready for the Innovation Studio project page. Links to fill in when submitting: the video URL.
+Copy-paste ready for the Innovation Studio project page. All links are filled in.
 
 ---
 
@@ -42,9 +42,9 @@ Microsoft Foundry (gpt-4.1-mini) · Microsoft Agent Framework · Azure AI Speech
 ## Links
 
 - Live demo: https://matchmind.blackisland-4799a434.japaneast.azurecontainerapps.io/
-- Code: https://github.com/ash-rafhamid/matchmind (make it public before submitting)
+- Code: https://github.com/ash-rafhamid/matchmind
 - MCP endpoint: https://matchmind.blackisland-4799a434.japaneast.azurecontainerapps.io/mcp/
-- Video: (add the YouTube link)
+- Video (1:55): https://youtu.be/aOTA-lcrBrU
 
 ## Category
 
